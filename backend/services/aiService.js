@@ -100,13 +100,38 @@ Format your response as a JSON object with this structure:
       console.log('📊 JS length:', parsed.javascript?.length || 0);
       console.log('🔍 First 200 chars of HTML:', parsed.html?.substring(0, 200));
       
-      // Format the code by adding proper line breaks
+      // Format HTML with basic indentation
       const formatHTML = (html) => {
         if (!html) return '';
-        return html
-          .replace(/></g, '>\n<')
-          .replace(/\n\s*\n/g, '\n')
-          .trim();
+        let formatted = html;
+        let indent = 0;
+        const tab = '  ';
+        
+        // Add newlines after tags
+        formatted = formatted.replace(/></g, '>\n<');
+        
+        // Basic indentation
+        const lines = formatted.split('\n');
+        const result = [];
+        
+        lines.forEach(line => {
+          const trimmed = line.trim();
+          if (!trimmed) return;
+          
+          // Decrease indent for closing tags
+          if (trimmed.startsWith('</')) {
+            indent = Math.max(0, indent - 1);
+          }
+          
+          result.push(tab.repeat(indent) + trimmed);
+          
+          // Increase indent for opening tags (not self-closing)
+          if (trimmed.startsWith('<') && !trimmed.startsWith('</') && !trimmed.endsWith('/>')) {
+            indent++;
+          }
+        });
+        
+        return result.join('\n');
       };
       
       const formatCSS = (css) => {
@@ -119,20 +144,17 @@ Format your response as a JSON object with this structure:
           .trim();
       };
       
+      // Don't format JavaScript - keep it as-is to avoid breaking syntax
       const formatJS = (js) => {
         if (!js) return '';
-        return js
-          .replace(/;(?!\s*[)\]])/g, ';\n')
-          .replace(/\{(?!\\)/g, ' {\n  ')
-          .replace(/\}(?!\\)/g, '\n}\n')
-          .replace(/\n\s*\n\s*\n/g, '\n\n')
-          .trim();
+        // Just return as-is - complex formatting can break code
+        return js;
       };
       
       return {
         html: formatHTML(parsed.html),
         css: formatCSS(parsed.css),
-        javascript: formatJS(parsed.javascript),
+        javascript: parsed.javascript || '', // Don't format JS
         components: parsed.components || [],
         description: parsed.description || ''
       };

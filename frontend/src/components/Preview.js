@@ -155,7 +155,7 @@ const Preview = ({ generatedCode }) => {
                 src={previewURL}
                 title="Website Preview"
                 className="preview-iframe"
-                sandbox="allow-scripts allow-same-origin"
+                sandbox="allow-scripts"
               />
             </div>
           </div>
