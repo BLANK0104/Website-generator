@@ -30,6 +30,11 @@ const Generator = ({ onGenerate, isLoading }) => {
         <p className="generator-subtitle">
           Describe your dream website in natural language and watch AI bring it to life
         </p>
+        {isLoading && (
+          <div className="loading-notice">
+            <p>⏱️ <strong>Please wait:</strong> Website generation may take up to 5 minutes. Thank you for your patience!</p>
+          </div>
+        )}
       </div>
 
       <form className="generator-form" onSubmit={handleSubmit}>

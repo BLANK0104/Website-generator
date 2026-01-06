@@ -24,6 +24,37 @@
   color: #666;
 }
 
+.loading-notice {
+  margin-top: 1.5rem;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+  border: 2px solid #ffc107;
+  border-radius: 8px;
+  animation: fadeIn 0.5s ease-in;
+}
+
+.loading-notice p {
+  margin: 0;
+  color: #856404;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.loading-notice strong {
+  color: #664d03;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .generator-form {
   background: white;
   padding: 2rem;

@@ -33,6 +33,22 @@ app.use('/api/generate', generateRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/components', componentRoutes);
 
+// Root health check endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'healthy',
+    message: 'AI Website Generator API is running',
+    version: '1.0.0',
+    endpoints: {
+      generate: '/api/generate',
+      projects: '/api/projects',
+      components: '/api/components',
+      health: '/health'
+    },
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
