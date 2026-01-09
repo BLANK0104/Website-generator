@@ -23,7 +23,7 @@ class AIService {
       if (isInitial) {
         const result = await this.generateWebsite(userMessage);
         conversation.currentWebsite = result;
-        conversation.messages.push({ role: 'assistant', content: `✅ ${result.description}` });
+        conversation.messages.push({ role: 'assistant', content: `✅ Created ${result.description}` });
       } else {
         const result = await this.modifyWebsite(conversation.currentWebsite, userMessage);
         conversation.currentWebsite = result;
@@ -39,6 +39,7 @@ class AIService {
           html: conversation.currentWebsite.html,
           css: conversation.currentWebsite.css,
           javascript: conversation.currentWebsite.javascript,
+          components: conversation.currentWebsite.components,
           description: conversation.currentWebsite.description
         },
         messages: conversation.messages
@@ -51,283 +52,562 @@ class AIService {
 
   async generateWebsite(description) {
     try {
-      const prompt = `You are a world-class web designer and developer. Create a STUNNING, MODERN, FULLY FUNCTIONAL website for: "${description}"
+      const contentPrompt = `Generate content for: "${description}"
 
-🎨 DESIGN EXCELLENCE - Make it VISUALLY SPECTACULAR:
-- **Modern Gradients**: Use vibrant color gradients (linear-gradient(135deg, #667eea 0%, #764ba2 100%))
-- **Glass Morphism**: backdrop-filter: blur(10px), semi-transparent backgrounds
-- **Smooth Animations**: CSS transitions, transform effects, fade-in on scroll
-- **Professional Shadows**: box-shadow: 0 10px 40px rgba(0,0,0,0.1)
-- **Hover Effects**: Scale, lift, glow effects on interactive elements
-- **Hero Section**: Full-screen with impressive background, bold typography
-- **Modern Typography**: Large headings (3-4rem), clear hierarchy, line-height 1.6
-- **Spacing**: Generous padding/margin, breathing room, max-width 1200px containers
-- **Color Schemes**: Professional palettes - blues/purples OR orange/red OR green/teal
-
-🚀 IMPRESSIVE FEATURES TO INCLUDE:
-- Sticky navigation with backdrop blur on scroll
-- Smooth scroll navigation between sections
-- Animated counters or stats section
-- Image cards with hover zoom effects
-- Testimonial slider or carousel
-- Contact form with validation
-- Footer with social links
-- Mobile hamburger menu
-- Parallax scroll effects (CSS only, no external libs)
-- Loading animations for images
-
-⚠️ CRITICAL RULES - NO EXTERNAL LIBRARIES:
-- **NO particles.js, THREE.js, or ANY external JS libraries**
-- **Use ONLY vanilla JavaScript** - no jQuery, no frameworks
-- **Use ONLY CSS animations** - no GSAP, no anime.js
-- **Self-contained code** - everything must work standalone
-- If you want particle effects, create them with vanilla JS canvas
-
-✅ WORKING CODE REQUIREMENTS:
-
-1. **HTML Structure**:
-   - Include <!DOCTYPE html>, proper head with meta tags
-   - Semantic HTML5 (header, nav, main, section, footer)
-   - All sections with clear IDs for navigation
-
-2. **ALL BUTTONS MUST WORK**:
-   \`\`\`html
-   <button onclick="smoothScroll('contact')">Contact</button>
-   <a href="tel:+15551234567">📞 Call</a>
-   <a href="mailto:email@example.com">✉️ Email</a>
-   \`\`\`
-
-3. **REAL IMAGES** - Use actual working URLs:
-   \`\`\`html
-   <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80" alt="Food">
-   <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=800&q=80" alt="Jewelry">
-   <img src="https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80" alt="Camera">
-   \`\`\`
-
-4. **COMPLETE JAVASCRIPT** - Define ALL functions used:
-   \`\`\`javascript
-   function smoothScroll(id) {
-     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-   }
-   
-   function toggleMenu() {
-     const menu = document.querySelector('.nav-menu');
-     menu?.classList.toggle('active');
-   }
-   
-   function handleSubmit(e) {
-     e.preventDefault();
-     alert('✅ Thank you! We will contact you soon.');
-     e.target.reset();
-   }
-   
-   // Add scroll animations
-   document.addEventListener('DOMContentLoaded', () => {
-     const observer = new IntersectionObserver((entries) => {
-       entries.forEach(entry => {
-         if (entry.isIntersecting) {
-           entry.target.classList.add('fade-in');
-         }
-       });
-     });
-     document.querySelectorAll('section').forEach(el => observer.observe(el));
-   });
-   \`\`\`
-
-5. **MODERN CSS** - Include these effects:
-   \`\`\`css
-   .fade-in {
-     animation: fadeInUp 0.8s ease;
-   }
-   
-   @keyframes fadeInUp {
-     from { opacity: 0; transform: translateY(30px); }
-     to { opacity: 1; transform: translateY(0); }
-   }
-   
-   .card {
-     transition: transform 0.3s, box-shadow 0.3s;
-   }
-   
-   .card:hover {
-     transform: translateY(-10px);
-     box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-   }
-   \`\`\`
-
-🎨 RETURN FORMAT (JSON ONLY):
+Return JSON with:
 {
-  "html": "complete HTML with <!DOCTYPE html>, head, body, ALL content",
-  "css": "complete CSS with modern effects, gradients, animations",
-  "javascript": "complete vanilla JS with ALL functions defined"
-}
+  "businessName": "business name",
+  "heroHeadline": "catchy headline",
+  "heroSubheadline": "subheadline",
+  "aboutText": "2-3 paragraphs about the business",
+  "services": [
+    {"name": "Service 1", "description": "details", "price": "$99"},
+    {"name": "Service 2", "description": "details", "price": "$149"},
+    {"name": "Service 3", "description": "details", "price": "$199"}
+  ],
+  "phone": "(555) 123-4567",
+  "email": "contact@business.com",
+  "address": "123 Main St, City, State",
+  "category": "restaurant|jewelry|photography|gym|spa|business"
+}`;
 
-⚠️ Return ONLY pure JSON, no markdown, no \`\`\`json tags!
-
-CREATE AN AMAZING WEBSITE NOW!`;
-
-      const result = await this.groq.chat.completions.create({
-        messages: [{ role: 'user', content: prompt }],
+      const completion = await this.groq.chat.completions.create({
+        messages: [{ role: 'user', content: contentPrompt }],
         model: 'llama-3.3-70b-versatile',
-        temperature: 0.9,
-        max_tokens: 8000,
+        temperature: 0.7,
+        max_tokens: 2000,
         response_format: { type: 'json_object' }
       });
-      
-      const website = JSON.parse(result.choices[0].message.content);
-      console.log('✅ Website generated with Groq');
-      
-      // Post-process to ensure everything works
-      const processedWebsite = this.postProcessWebsite(website);
+
+      const content = JSON.parse(completion.choices[0].message.content);
+      const website = this.buildTemplate(content);
       
       return {
-        html: processedWebsite.html,
-        css: processedWebsite.css,
-        javascript: processedWebsite.javascript,
-        description: this.extractDescription(processedWebsite.html, description)
+        ...website,
+        content,
+        description: `professional website for ${content.businessName}`
       };
     } catch (error) {
       console.error('Generation Error:', error);
-      throw new Error(`Failed to generate website: ${error.message}`);
+      throw new Error(`Failed to generate: ${error.message}`);
     }
   }
 
   async modifyWebsite(currentWebsite, modification) {
     try {
-      const prompt = `You are an expert web developer. Modify the existing website based on the user's request.
+      const modificationPrompt = `You are an expert web developer. The user wants to modify their website.
 
 CURRENT WEBSITE CODE:
-HTML (first 2000 chars): ${currentWebsite.html.substring(0, 2000)}...
-CSS (first 1000 chars): ${currentWebsite.css.substring(0, 1000)}...
-JavaScript: ${currentWebsite.javascript || 'none'}
+
+HTML:
+${currentWebsite.html}
+
+CSS:
+${currentWebsite.css}
+
+JAVASCRIPT:
+${currentWebsite.javascript || 'none'}
 
 USER REQUEST: "${modification}"
 
-📋 MODIFICATION RULES:
-1. Make EXACTLY the changes the user requested
-2. Keep all working functionality (don't break existing buttons/features)
-3. If changing colors: update CSS hex codes, gradients, backgrounds
-4. If changing text: update HTML content
-5. If adding features: add HTML structure, CSS styles, JavaScript functions
-6. If changing layout: modify CSS grid/flexbox
-7. Maintain responsive design
+INSTRUCTIONS:
+1. Make the EXACT changes the user requested
+2. Common requests: change colors, change text, add/remove sections, change layout, update images
+3. For color changes: Find and replace hex codes in CSS (background, color properties)
+4. For text changes: Update the specific text in HTML
+5. For structure changes: Modify HTML structure and CSS accordingly
+6. KEEP all working buttons and JavaScript functions intact unless specifically asked to change them
+7. Return COMPLETE modified HTML, CSS, and JavaScript (not snippets)
 
-⚠️ CRITICAL: Return COMPLETE updated code, not just snippets!
-
-🎨 RETURN FORMAT:
+Return JSON:
 {
-  "html": "COMPLETE updated HTML",
-  "css": "COMPLETE updated CSS",
-  "javascript": "COMPLETE updated JavaScript"
-}
+  "html": "complete updated HTML code",
+  "css": "complete updated CSS code", 
+  "javascript": "complete JavaScript code (keep existing if not changed)",
+  "description": "brief description of what was changed"
+}`;
 
-Return ONLY the JSON object, no markdown formatting!`;
-
-      const result = await this.groq.chat.completions.create({
-        messages: [{ role: 'user', content: prompt }],
+      const completion = await this.groq.chat.completions.create({
+        messages: [{ role: 'user', content: modificationPrompt }],
         model: 'llama-3.3-70b-versatile',
-        temperature: 0.7,
+        temperature: 0.5,
         max_tokens: 8000,
         response_format: { type: 'json_object' }
       });
-      
-      const website = JSON.parse(result.choices[0].message.content);
-      console.log('🔄 Website modified with Groq');
-      
-      const processedWebsite = this.postProcessWebsite(website);
+
+      const modified = JSON.parse(completion.choices[0].message.content);
       
       return {
-        html: processedWebsite.html || currentWebsite.html,
-        css: processedWebsite.css || currentWebsite.css,
-        javascript: processedWebsite.javascript || currentWebsite.javascript,
-        description: `Modified: ${modification}`
+        html: modified.html || currentWebsite.html,
+        css: modified.css || currentWebsite.css,
+        javascript: modified.javascript || currentWebsite.javascript || '',
+        components: currentWebsite.components,
+        content: currentWebsite.content,
+        description: modified.description || 'Updated website'
       };
     } catch (error) {
       console.error('Modification Error:', error);
-      throw new Error(`Failed to modify website: ${error.message}`);
+      throw new Error(`Failed to modify: ${error.message}`);
     }
   }
 
-  postProcessWebsite(website) {
-    let html = website.html || '';
-    let css = website.css || '';
-    let js = website.javascript || '';
+  buildTemplate(content) {
+    const imageMap = {
+      restaurant: ['photo-1504674900247-0877df9cc836', 'photo-1555939594-58d7cb561ad1', 'photo-1540189549336-e6e99c3679fe'],
+      jewelry: ['photo-1515562141207-7a88fb7ce338', 'photo-1535632066927-ab7c9ab60908', 'photo-1599643478518-a784e5dc4c8f'],
+      photography: ['photo-1542038784456-1ea8e935640e', 'photo-1471341971476-ae15ff5dd4ea', 'photo-1452587925148-ce544e77e70d'],
+      gym: ['photo-1534438327276-14e5300c3a48', 'photo-1517836357463-d25dfeac3438', 'photo-1571019614242-c5c5dee9f50b'],
+      spa: ['photo-1544161515-4ab6ce6db874', 'photo-1552693673-1bf958298935', 'photo-1540555700478-4be289fbecef'],
+      business: ['photo-1557804506-669a67965ba0', 'photo-1516802273409-68526ee1bdd6', 'photo-1497366216548-37526070297c']
+    };
+
+    const images = imageMap[content.category] || imageMap.business;
     
-    // Fix 1: Ensure smoothScroll function exists
-    if (html.includes('smoothScroll(') && !js.includes('function smoothScroll')) {
-      js += `\n\nfunction smoothScroll(id) {
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${content.businessName}</title>
+</head>
+<body>
+  <header>
+    <nav>
+      <div class="logo">${content.businessName}</div>
+      <button class="mobile-toggle" onclick="toggleMenu()">☰</button>
+      <div class="nav-menu" id="navMenu">
+        <a onclick="smoothScroll('hero')">Home</a>
+        <a onclick="smoothScroll('about')">About</a>
+        <a onclick="smoothScroll('services')">Services</a>
+        <a onclick="smoothScroll('contact')">Contact</a>
+      </div>
+    </nav>
+  </header>
+
+  <section id="hero" class="hero">
+    <div class="hero-content">
+      <h1>${content.heroHeadline}</h1>
+      <p>${content.heroSubheadline}</p>
+      <button onclick="smoothScroll('services')" class="cta-btn">Explore Services</button>
+      <button onclick="smoothScroll('contact')" class="cta-btn secondary">Contact Us</button>
+    </div>
+    <img src="https://images.unsplash.com/${images[0]}?w=800&q=80" alt="Hero" class="hero-image">
+  </section>
+
+  <section id="about" class="about">
+    <h2>About Us</h2>
+    <div class="about-content">
+      <img src="https://images.unsplash.com/${images[1]}?w=800&q=80" alt="About" class="about-image">
+      <div class="about-text">
+        <p>${content.aboutText}</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="services" class="services">
+    <h2>Our Services</h2>
+    <div class="services-grid">
+      ${content.services.map((service, i) => `
+        <div class="service-card">
+          <img src="https://images.unsplash.com/${images[i % images.length]}?w=800&q=80" alt="${service.name}">
+          <h3>${service.name}</h3>
+          <p>${service.description}</p>
+          <p class="price">${service.price}</p>
+          <button class="service-btn" onclick="smoothScroll('contact')">Learn More</button>
+        </div>
+      `).join('')}
+    </div>
+  </section>
+
+  <section id="contact" class="contact">
+    <h2>Contact Us</h2>
+    <div class="contact-container">
+      <form onsubmit="handleSubmit(event)">
+        <input type="text" placeholder="Your Name" required>
+        <input type="email" placeholder="Your Email" required>
+        <textarea placeholder="Your Message" rows="5" required></textarea>
+        <button type="submit" class="submit-btn">Send Message</button>
+      </form>
+      
+      <div class="contact-info">
+        <h3>Get In Touch</h3>
+        <p><strong>Phone:</strong> <a href="tel:${content.phone.replace(/[^\d]/g, '')}">${content.phone}</a></p>
+        <p><strong>Email:</strong> <a href="mailto:${content.email}">${content.email}</a></p>
+        <p><strong>Address:</strong> ${content.address}</p>
+        
+        <div class="social-links">
+          <button class="social-btn" onclick="alert('Follow us on Facebook!')">Facebook</button>
+          <button class="social-btn" onclick="alert('Follow us on Instagram!')">Instagram</button>
+          <button class="social-btn" onclick="alert('Follow us on Twitter!')">Twitter</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>&copy; 2026 ${content.businessName}. All rights reserved.</p>
+  </footer>
+</body>
+</html>`;
+
+    const css = `* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+  color: #333;
+  background: #fff;
+}
+
+header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+nav {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2rem;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.mobile-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.nav-menu {
+  display: flex;
+  gap: 2rem;
+}
+
+.nav-menu a {
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.3s;
+}
+
+.nav-menu a:hover {
+  opacity: 0.8;
+}
+
+.hero {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 4rem 2rem;
+  text-align: center;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero h1 {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  font-size: 1.3rem;
+  margin-bottom: 2rem;
+}
+
+.hero-image {
+  max-width: 800px;
+  width: 100%;
+  height: 400px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-top: 2rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.cta-btn {
+  background: white;
+  color: #667eea;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  border-radius: 50px;
+  cursor: pointer;
+  margin: 0.5rem;
+  font-weight: bold;
+  transition: transform 0.3s;
+}
+
+.cta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+.cta-btn.secondary {
+  background: transparent;
+  border: 2px solid white;
+  color: white;
+}
+
+.about, .services, .contact {
+  max-width: 1200px;
+  margin: 4rem auto;
+  padding: 2rem;
+}
+
+.about h2, .services h2, .contact h2 {
+  text-align: center;
+  font-size: 2.5rem;
+  margin-bottom: 2rem;
+  color: #667eea;
+}
+
+.about-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: center;
+}
+
+.about-image {
+  width: 100%;
+  height: 400px;
+  object-fit: cover;
+  border-radius: 10px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+}
+
+.about-text p {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.service-card {
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+  transition: transform 0.3s;
+}
+
+.service-card:hover {
+  transform: translateY(-5px);
+}
+
+.service-card img {
+  width: 100%;
+  height: 250px;
+  object-fit: cover;
+}
+
+.service-card h3 {
+  padding: 1rem;
+  color: #667eea;
+}
+
+.service-card p {
+  padding: 0 1rem 1rem;
+}
+
+.price {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #764ba2;
+}
+
+.service-btn {
+  width: calc(100% - 2rem);
+  margin: 1rem;
+  padding: 0.8rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.contact-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+input, textarea {
+  padding: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 5px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+input:focus, textarea:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.submit-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 1rem;
+  font-size: 1.1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.contact-info {
+  background: #f8f9fa;
+  padding: 2rem;
+  border-radius: 10px;
+}
+
+.contact-info h3 {
+  color: #667eea;
+  margin-bottom: 1rem;
+}
+
+.contact-info p {
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+.contact-info a {
+  color: #667eea;
+  text-decoration: none;
+}
+
+.contact-info a:hover {
+  text-decoration: underline;
+}
+
+.social-links {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.social-btn {
+  padding: 0.8rem 1.5rem;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.social-btn:hover {
+  background: #764ba2;
+}
+
+footer {
+  background: #333;
+  color: white;
+  text-align: center;
+  padding: 2rem;
+  margin-top: 4rem;
+}
+
+@media (max-width: 768px) {
+  .mobile-toggle {
+    display: block;
+  }
+  
+  .nav-menu {
+    display: none;
+    flex-direction: column;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #667eea;
+    padding: 1rem;
+  }
+  
+  .nav-menu.active {
+    display: flex !important;
+  }
+  
+  .hero h1 {
+    font-size: 2rem;
+  }
+  
+  .about-content, .contact-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .services-grid {
+    grid-template-columns: 1fr;
+  }
+}`;
+
+    const javascript = `function smoothScroll(id) {
   const element = document.getElementById(id);
   if (element) {
     element.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
-}\n`;
-    }
-    
-    // Fix 2: Ensure toggleMenu function exists
-    if ((html.includes('toggleMenu()') || html.includes('mobile-toggle')) && !js.includes('function toggleMenu')) {
-      js += `\nfunction toggleMenu() {
-  const menu = document.querySelector('.nav-menu') || document.querySelector('nav ul') || document.getElementById('menu');
+}
+
+function toggleMenu() {
+  const menu = document.getElementById('navMenu');
   if (menu) {
     menu.classList.toggle('active');
   }
-}\n`;
-    }
-    
-    // Fix 3: Ensure form submit handlers exist
-    if (html.includes('onsubmit=') && !js.includes('function handleSubmit')) {
-      js += `\nfunction handleSubmit(event) {
-  event.preventDefault();
-  alert('✅ Thank you! Your message has been submitted successfully.');
-  event.target.reset();
-  return false;
-}\n`;
-    }
-    
-    // Fix 4: Fix broken image URLs
-    html = html.replace(/src="https?:\/\/source\.unsplash\.com\/random/g, 'src="https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&q=80');
-    html = html.replace(/src="images\//g, 'src="https://via.placeholder.com/800x600/667eea/ffffff?text=Image');
-    html = html.replace(/src="assets\//g, 'src="https://via.placeholder.com/800x600/667eea/ffffff?text=Image');
-    html = html.replace(/src="\.\.\/images\//g, 'src="https://via.placeholder.com/800x600/667eea/ffffff?text=Image');
-    
-    // Fix 5: Convert href="#" to working links
-    html = html.replace(/href="#"([^>]*?)>/g, (match) => {
-      if (!match.includes('onclick') && !match.includes('data-')) {
-        return match.replace('href="#"', 'href="javascript:void(0)" onclick="alert(\'Coming soon!\')"');
-      }
-      return match;
-    });
-    
-    // Fix 6: Add DOMContentLoaded wrapper if JavaScript exists and doesn't have it
-    if (js && !js.includes('DOMContentLoaded') && !js.includes('window.onload')) {
-      const functionsOnly = js.match(/function\s+\w+/g);
-      if (!functionsOnly || functionsOnly.length < 3) {
-        js = `document.addEventListener('DOMContentLoaded', function() {\n${js}\n});\n`;
-      }
-    }
-    
-    // Fix 7: Ensure mobile responsiveness in CSS
-    if (css && !css.includes('@media') && !css.includes('max-width')) {
-      css += `\n\n@media (max-width: 768px) {
-  .nav-menu { display: none; flex-direction: column; }
-  .nav-menu.active { display: flex !important; }
-  .mobile-toggle { display: block !important; }
-  .container { padding: 1rem; }
-  h1 { font-size: 2rem !important; }
-}\n`;
-    }
-    
-    return { html, css, javascript: js };
-  }
+}
 
-  extractDescription(html, originalRequest) {
-    // Try to extract title or first heading
-    const titleMatch = html.match(/<title>(.*?)<\/title>/i);
-    if (titleMatch) return `Created: ${titleMatch[1]}`;
-    
-    const h1Match = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
-    if (h1Match) return `Created: ${h1Match[1].replace(/<[^>]*>/g, '')}`;
-    
-    return `Created website: ${originalRequest.substring(0, 50)}`;
+function handleSubmit(event) {
+  event.preventDefault();
+  alert('✅ Thank you! Your message has been sent successfully. We will get back to you soon!');
+  event.target.reset();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const navLinks = document.querySelectorAll('.nav-menu a');
+  navLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      const menu = document.getElementById('navMenu');
+      if (menu) {
+        menu.classList.remove('active');
+      }
+    });
+  });
+});`;
+
+    return { html, css, javascript, components: ['Single Page Website'] };
   }
 }
 
