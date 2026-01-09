@@ -14,13 +14,13 @@ Visual representations of how the AI Website Generator works.
                         ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                   FRONTEND (React)                          │
-│  ┌──────────────┐  ┌───────────┐  ┌─────────────────────┐  │
-│  │  Generator   │  │  Preview  │  │     Projects        │  │
-│  │  Component   │  │ Component │  │     Component       │  │
-│  └──────┬───────┘  └─────┬─────┘  └──────┬──────────────┘  │
-│         │                 │                │                 │
-│         └─────────────────┴────────────────┘                 │
-│                           │                                  │
+│  ┌──────────────┐  ┌───────────┐  ┌──────────────────────┐  │
+│  │  Generator   │  │  Preview  │  │     Projects         │  │
+│  │  Component   │  │ Component │  │     Component        │  │
+│  └──────┬───────┘  └──────┬────┘  └────────┬─────────────┘  │
+│         │                 │                │                │
+│         └─────────────────┴────────────────┘                │
+│                           │                                 │
 │                    ┌──────▼───────┐                         │
 │                    │  API Service │                         │
 │                    └──────┬───────┘                         │
@@ -31,19 +31,19 @@ Visual representations of how the AI Website Generator works.
 ┌─────────────────────────────────────────────────────────────┐
 │                  BACKEND (Node.js/Express)                  │
 │                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │               API Routes Layer                      │   │
-│  │  /generate  │  /projects  │  /components           │   │
-│  └───────┬──────────┬─────────────┬────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │               API Routes Layer                      │    │
+│  │  /generate  │  /projects  │  /components            │    │
+│  └───────┬──────────┬─────────────┬────────────────────┘    │
 │          │          │             │                         │
-│  ┌───────▼──────────▼─────────────▼────────────────────┐   │
-│  │            Controllers & Logic                      │   │
-│  └───────┬──────────┬─────────────┬────────────────────┘   │
+│  ┌───────▼──────────▼─────────────▼────────────────────┐    │
+│  │            Controllers & Logic                      │    │
+│  └───────┬──────────┬─────────────┬────────────────────┘    │ 
 │          │          │             │                         │
-│  ┌───────▼──────┐   │      ┌──────▼──────────────────┐     │
-│  │ AI Service   │   │      │  Component Templates    │     │
-│  │ (OpenAI)     │   │      │  (6 UI Components)      │     │
-│  └───────┬──────┘   │      └─────────────────────────┘     │
+│  ┌───────▼──────┐   │      ┌──────▼──────────────────┐      │
+│  │ AI Service   │   │      │  Component Templates    │      │
+│  │ (OpenAI)     │   │      │  (6 UI Components)      │      │
+│  └───────┬──────┘   │      └─────────────────────────┘      │
 │          │          │                                       │
 └──────────┼──────────┼───────────────────────────────────────┘
            │          │
@@ -271,34 +271,34 @@ User Clicks Project
 ├─────────────────────────────────────────────────────┤
 │                                                     │
 │  navbar:                                            │
-│  ├─ HTML: <nav>...</nav>                           │
-│  ├─ CSS:  .navbar {...}                            │
-│  └─ JS:   (optional)                               │
+│  ├─ HTML: <nav>...</nav>                            │
+│  ├─ CSS:  .navbar {...}                             │
+│  └─ JS:   (optional)                                │
 │                                                     │
 │  hero:                                              │
-│  ├─ HTML: <section class="hero">...                │
-│  ├─ CSS:  .hero {...}                              │
-│  └─ JS:   (none)                                   │
+│  ├─ HTML: <section class="hero">...                 │
+│  ├─ CSS:  .hero {...}                               │
+│  └─ JS:   (none)                                    │ 
 │                                                     │
 │  features:                                          │
-│  ├─ HTML: <section class="features">...            │
-│  ├─ CSS:  .features-grid {...}                     │
-│  └─ JS:   (none)                                   │
+│  ├─ HTML: <section class="features">...             │
+│  ├─ CSS:  .features-grid {...}                      │
+│  └─ JS:   (none)                                    │
 │                                                     │
 │  gallery:                                           │
-│  ├─ HTML: <section class="gallery">...             │
-│  ├─ CSS:  .gallery-grid {...}                      │
-│  └─ JS:   (optional interactions)                  │
+│  ├─ HTML: <section class="gallery">...              │
+│  ├─ CSS:  .gallery-grid {...}                       │
+│  └─ JS:   (optional interactions)                   │
 │                                                     │
 │  contactForm:                                       │
-│  ├─ HTML: <form>...</form>                         │
-│  ├─ CSS:  .contact-form {...}                      │
-│  └─ JS:   form validation                          │
+│  ├─ HTML: <form>...</form>                          │
+│  ├─ CSS:  .contact-form {...}                       │
+│  └─ JS:   form validation                           │
 │                                                     │
 │  footer:                                            │
-│  ├─ HTML: <footer>...</footer>                     │
-│  ├─ CSS:  .footer {...}                            │
-│  └─ JS:   (none)                                   │
+│  ├─ HTML: <footer>...</footer>                      │
+│  ├─ CSS:  .footer {...}                             │
+│  └─ JS:   (none)                                    │
 │                                                     │
 └─────────────────────────────────────────────────────┘
          │
@@ -323,7 +323,7 @@ User Clicks Project
        │ 1. Enters prompt
        ▼
 ┌──────────────┐      2. API Call      ┌──────────────┐
-│   React UI   │ ───────────────────> │   Express    │
+│   React UI   │ ───────────────────>  │   Express    │
 │  (Frontend)  │                       │   Backend    │
 └──────┬───────┘                       └──────┬───────┘
        │                                      │
@@ -353,10 +353,10 @@ User Clicks Project
 ├─────────────────────────────────────────────────┤
 │                                                 │
 │  State:                                         │
-│  ├─ generatedCode: null | CodeObject           │
-│  ├─ isLoading: boolean                         │
-│  ├─ error: null | string                       │
-│  └─ currentView: 'home' | 'projects'           │
+│  ├─ generatedCode: null | CodeObject            │
+│  ├─ isLoading: boolean                          │
+│  ├─ error: null | string                        │
+│  └─ currentView: 'home' | 'projects'            │
 │                                                 │
 └───┬─────────────────────────────────────────────┘
     │
@@ -368,7 +368,7 @@ User Clicks Project
 ┌──────────┐          ┌──────────┐        ┌──────────┐
 │Generator │          │ Preview  │        │ Projects │
 │Component │          │Component │        │Component │
-└────┬─────┘          └────┬─────┘        └────┬─────┘
+└────┬─────┘          └────┬─────┘        └─────┬────┘
      │                     │                    │
      │ Local State:        │ Local State:       │ Local State:
      │ - prompt            │ - viewMode         │ - projects[]

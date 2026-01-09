@@ -1,229 +1,222 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require('groq-sdk');
 
 class AIService {
   constructor() {
-    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    
-    // Define JSON schema for website generation
-    const schema = {
-      type: 'object',
-      properties: {
-        html: { type: 'string' },
-        css: { type: 'string' },
-        javascript: { type: 'string' },
-        components: { 
-          type: 'array',
-          items: { type: 'string' }
-        },
-        description: { type: 'string' }
-      },
-      required: ['html', 'css', 'javascript', 'components', 'description']
-    };
-    
-    this.model = this.genAI.getGenerativeModel({ 
-      model: 'gemini-2.5-flash',
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema: schema
-      }
+    this.groq = new Groq({
+      apiKey: process.env.GROQ_API_KEY
     });
   }
 
-  /**
-   * Generate website code from a natural language prompt
-   * @param {string} prompt - User's description of the website
-   * @param {Array} components - Available component templates
-   * @returns {Object} Generated HTML, CSS, and JavaScript code
-   */
-  async generateWebsite(prompt, components = []) {
+  async generateWebsite(description) {
     try {
-      const systemPrompt = `You are an expert web developer and designer. Generate complete, production-ready HTML, CSS, and JavaScript code for websites based on user descriptions.
+      const contentPrompt = `Based on this business: "${description}"
 
-IMPORTANT RULES:
-1. Generate ONLY valid HTML5, CSS3, and vanilla JavaScript
-2. Make the design modern, responsive, and visually appealing
-3. Use semantic HTML tags
-4. Include proper meta tags and responsive viewport settings
-5. Use CSS Grid and Flexbox for layouts
-6. Add smooth animations and transitions
-7. Ensure accessibility (ARIA labels, alt text, proper contrast)
-8. Generate complete, self-contained code (no external dependencies except common CDNs for fonts/icons if needed)
-9. Include meaningful placeholder content relevant to the website type
-10. Add comments to explain complex sections
+Generate realistic content (no HTML, just text):
+1. Business name (e.g., "Marco's Italian Kitchen")
+2. Hero headline (1 sentence)
+3. Hero subheadline (1 sentence)
+4. About text (2-3 paragraphs)
+5. Three services/items: name, description, price
+6. Phone: (555) XXX-XXXX
+7. Email: businessname@example.com
+8. Address: full address
+9. Category: restaurant|jewelry|photography|gym|spa
 
-Available component patterns: ${components.join(', ')}
+Return JSON with these fields: businessName, heroHeadline, heroSubheadline, aboutText, services (array of {name, description, price}), phone, email, address, category`;
 
-Format your response as a JSON object with this structure:
-{
-  "html": "complete HTML code",
-  "css": "complete CSS code",
-  "javascript": "complete JavaScript code (if needed)",
-  "components": ["list of component types used"],
-  "description": "brief description of the generated website"
-}`;
+      const contentCompletion = await this.groq.chat.completions.create({
+        messages: [{ role: 'user', content: contentPrompt }],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.7,
+        max_tokens: 2000,
+        response_format: { type: 'json_object' }
+      });
 
-      const fullPrompt = `${systemPrompt}\n\nUser Request: ${prompt}`;
-      
-      const result = await this.model.generateContent(fullPrompt);
-      const response = await result.response;
-      let text = response.text();
-      
-      console.log('📝 Raw Gemini response length:', text.length);
-      
-      // With responseMimeType set to application/json, Gemini should return clean JSON
-      // But we still handle potential edge cases
-      let jsonText = text.trim();
-      
-      // Remove markdown code blocks if present
-      if (jsonText.startsWith('```')) {
-        const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (match) {
-          jsonText = match[1].trim();
-          console.log('✅ Removed markdown code block wrapper');
-        }
-      }
-      
-      console.log('🔍 Attempting to parse JSON...');
-      
-      let parsed;
-      try {
-        parsed = JSON.parse(jsonText);
-      } catch (parseError) {
-        console.error('❌ JSON Parse Error:', parseError.message);
-        console.error('📄 Problematic area:', jsonText.substring(Math.max(0, parseError.message.match(/\d+/)?.[0] - 100 || 0), Math.min(jsonText.length, (parseError.message.match(/\d+/)?.[0] || 0) + 100)));
-        throw parseError;
-      }
-      
-      console.log('✅ Successfully parsed JSON');
-      console.log('📊 HTML length:', parsed.html?.length || 0);
-      console.log('📊 CSS length:', parsed.css?.length || 0);
-      console.log('📊 JS length:', parsed.javascript?.length || 0);
-      console.log('🔍 First 200 chars of HTML:', parsed.html?.substring(0, 200));
-      
-      // Format HTML with basic indentation
-      const formatHTML = (html) => {
-        if (!html) return '';
-        let formatted = html;
-        let indent = 0;
-        const tab = '  ';
-        
-        // Add newlines after tags
-        formatted = formatted.replace(/></g, '>\n<');
-        
-        // Basic indentation
-        const lines = formatted.split('\n');
-        const result = [];
-        
-        lines.forEach(line => {
-          const trimmed = line.trim();
-          if (!trimmed) return;
-          
-          // Decrease indent for closing tags
-          if (trimmed.startsWith('</')) {
-            indent = Math.max(0, indent - 1);
-          }
-          
-          result.push(tab.repeat(indent) + trimmed);
-          
-          // Increase indent for opening tags (not self-closing)
-          if (trimmed.startsWith('<') && !trimmed.startsWith('</') && !trimmed.endsWith('/>')) {
-            indent++;
-          }
-        });
-        
-        return result.join('\n');
-      };
-      
-      const formatCSS = (css) => {
-        if (!css) return '';
-        return css
-          .replace(/\{/g, ' {\n  ')
-          .replace(/;/g, ';\n  ')
-          .replace(/\}/g, '\n}\n\n')
-          .replace(/\n\s*\n\s*\n/g, '\n\n')
-          .trim();
-      };
-      
-      // Don't format JavaScript - keep it as-is to avoid breaking syntax
-      const formatJS = (js) => {
-        if (!js) return '';
-        // Just return as-is - complex formatting can break code
-        return js;
-      };
-      
-      return {
-        html: formatHTML(parsed.html),
-        css: formatCSS(parsed.css),
-        javascript: parsed.javascript || '', // Don't format JS
-        components: parsed.components || [],
-        description: parsed.description || ''
-      };
+      const content = JSON.parse(contentCompletion.choices[0].message.content);
+      console.log('✅ Content generated:', content.businessName);
+
+      return this.buildFromTemplate(content);
     } catch (error) {
       console.error('AI Service Error:', error);
       throw new Error(`Failed to generate website: ${error.message}`);
     }
   }
 
-  /**
-   * Generate content for specific sections
-   * @param {string} sectionType - Type of content (heading, paragraph, etc.)
-   * @param {string} context - Context for content generation
-   * @returns {string} Generated content
-   */
-  async generateContent(sectionType, context) {
-    try {
-      const promptText = `You are a creative copywriter. Generate engaging, professional content for websites.\n\nGenerate ${sectionType} content for: ${context}`;
-      
-      const result = await this.model.generateContent(promptText);
-      const response = await result.response;
-      
-      return response.text().trim();
-    } catch (error) {
-      console.error('Content Generation Error:', error);
-      throw new Error(`Failed to generate content: ${error.message}`);
-    }
-  }
+  buildFromTemplate(content) {
+    const imageMap = {
+      restaurant: ['photo-1504674900247-0877df9cc836', 'photo-1555939594-58d7cb561ad1', 'photo-1540189549336-e6e99c3679fe'],
+      jewelry: ['photo-1515562141207-7a88fb7ce338', 'photo-1535632066927-ab7c9ab60908', 'photo-1599643478518-a784e5dc4c8f'],
+      photography: ['photo-1542038784456-1ea8e935640e', 'photo-1471341971476-ae15ff5dd4ea', 'photo-1452587925148-ce544e77e70d'],
+      gym: ['photo-1534438327276-14e5300c3a48', 'photo-1517836357463-d25dfeac3438', 'photo-1571019614242-c5c5dee9f50b'],
+      spa: ['photo-1544161515-4ab6ce6db874', 'photo-1552693673-1bf958298935', 'photo-1540555700478-4be289fbecef'],
+      default: ['photo-1557804506-669a67965ba0', 'photo-1516802273409-68526ee1bdd6', 'photo-1518173946687-a4c8892bbd9f']
+    };
 
-  /**
-   * Improve existing code
-   * @param {Object} code - Existing HTML, CSS, JS code
-   * @param {string} improvements - Requested improvements
-   * @returns {Object} Improved code
-   */
-  async improveCode(code, improvements) {
-    try {
-      const prompt = `Improve the following website code based on these requirements: ${improvements}
+    const images = imageMap[content.category] || imageMap.default;
+    
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${content.businessName}</title>
+</head>
+<body>
+  <header>
+    <nav>
+      <div class="logo">${content.businessName}</div>
+      <button class="mobile-toggle" onclick="toggleMenu()">☰</button>
+      <div class="nav-menu" id="navMenu">
+        <a href="#hero" onclick="smoothScroll('hero')">Home</a>
+        <a href="#about" onclick="smoothScroll('about')">About</a>
+        <a href="#services" onclick="smoothScroll('services')">Services</a>
+        <a href="#contact" onclick="smoothScroll('contact')">Contact</a>
+      </div>
+    </nav>
+  </header>
 
-Current HTML:
-${code.html}
+  <section id="hero" class="hero">
+    <div class="hero-content">
+      <h1>${content.heroHeadline}</h1>
+      <p>${content.heroSubheadline}</p>
+      <button onclick="smoothScroll('services')" class="cta-btn">Explore Services</button>
+      <button onclick="smoothScroll('contact')" class="cta-btn secondary">Contact Us</button>
+    </div>
+    <img src="https://images.unsplash.com/${images[0]}?w=1200&q=80" alt="${content.businessName}" class="hero-image">
+  </section>
 
-Current CSS:
-${code.css}
+  <section id="about" class="about">
+    <h2>About Us</h2>
+    <div class="about-content">
+      <img src="https://images.unsplash.com/${images[1]}?w=600&q=80" alt="About" class="about-image">
+      <div class="about-text">
+        <p>${content.aboutText}</p>
+      </div>
+    </div>
+  </section>
 
-Current JavaScript:
-${code.javascript || 'None'}
+  <section id="services" class="services">
+    <h2>Our Services</h2>
+    <div class="services-grid">
+      ${content.services.map((service, index) => `
+        <div class="service-card">
+          <img src="https://images.unsplash.com/${images[index % images.length]}?w=400&q=80" alt="${service.name}">
+          <h3>${service.name}</h3>
+          <p>${service.description}</p>
+          <p class="price">${service.price}</p>
+          <button onclick="smoothScroll('contact')" class="service-btn">Book Now</button>
+        </div>
+      `).join('')}
+    </div>
+  </section>
 
-Return improved code in JSON format with html, css, and javascript fields.`;
+  <section id="contact" class="contact">
+    <h2>Get In Touch</h2>
+    <div class="contact-container">
+      <form id="contactForm" onsubmit="handleSubmit(event)">
+        <input type="text" placeholder="Your Name" required>
+        <input type="email" placeholder="Your Email" required>
+        <input type="tel" placeholder="Your Phone" required>
+        <textarea placeholder="Your Message" rows="5" required></textarea>
+        <button type="submit" class="submit-btn">Send Message</button>
+      </form>
+      <div class="contact-info">
+        <h3>Contact Information</h3>
+        <p><strong>📞 Phone:</strong> ${content.phone}</p>
+        <p><strong>📧 Email:</strong> ${content.email}</p>
+        <p><strong>📍 Address:</strong> ${content.address}</p>
+        <div class="social-links">
+          <a href="https://facebook.com" target="_blank" class="social-btn">Facebook</a>
+          <a href="https://instagram.com" target="_blank" class="social-btn">Instagram</a>
+          <a href="https://twitter.com" target="_blank" class="social-btn">Twitter</a>
+        </div>
+      </div>
+    </div>
+  </section>
 
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      
-      // Extract JSON from response
-      let jsonText = text;
-      const jsonMatch = text.match(/```json\s*([\s\S]*?)```/);
-      if (jsonMatch) {
-        jsonText = jsonMatch[1];
-      } else if (text.includes('```')) {
-        const codeMatch = text.match(/```\s*([\s\S]*?)```/);
-        if (codeMatch) jsonText = codeMatch[1];
-      }
+  <footer>
+    <p>&copy; 2026 ${content.businessName}. All rights reserved.</p>
+  </footer>
+</body>
+</html>`;
 
-      return JSON.parse(jsonText.trim());
-    } catch (error) {
-      console.error('Code Improvement Error:', error);
-      throw new Error(`Failed to improve code: ${error.message}`);
-    }
+    const css = `* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem 0; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+nav { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 2rem; }
+.logo { font-size: 1.5rem; font-weight: bold; }
+.mobile-toggle { display: none; background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
+.nav-menu { display: flex; gap: 2rem; }
+.nav-menu a { color: white; text-decoration: none; font-weight: 500; cursor: pointer; transition: opacity 0.3s; }
+.nav-menu a:hover { opacity: 0.8; }
+.hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4rem 2rem; text-align: center; min-height: 500px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.hero h1 { font-size: 3rem; margin-bottom: 1rem; }
+.hero p { font-size: 1.3rem; margin-bottom: 2rem; }
+.hero-image { max-width: 800px; width: 100%; height: 400px; object-fit: cover; border-radius: 10px; margin-top: 2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+.cta-btn { background: white; color: #667eea; border: none; padding: 1rem 2rem; font-size: 1.1rem; border-radius: 50px; cursor: pointer; margin: 0.5rem; font-weight: bold; transition: transform 0.3s; }
+.cta-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+.cta-btn.secondary { background: transparent; border: 2px solid white; color: white; }
+.about, .services, .contact { max-width: 1200px; margin: 4rem auto; padding: 2rem; }
+.about h2, .services h2, .contact h2 { text-align: center; font-size: 2.5rem; margin-bottom: 2rem; color: #667eea; }
+.about-content { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; }
+.about-image { width: 100%; height: 400px; object-fit: cover; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+.about-text p { font-size: 1.1rem; margin-bottom: 1rem; }
+.services-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; }
+.service-card { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.1); transition: transform 0.3s; }
+.service-card:hover { transform: translateY(-5px); }
+.service-card img { width: 100%; height: 250px; object-fit: cover; }
+.service-card h3 { padding: 1rem; color: #667eea; }
+.service-card p { padding: 0 1rem 1rem; }
+.price { font-size: 1.5rem; font-weight: bold; color: #764ba2; }
+.service-btn { width: calc(100% - 2rem); margin: 1rem; padding: 0.8rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem; font-weight: bold; }
+.contact-container { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; }
+form { display: flex; flex-direction: column; gap: 1rem; }
+input, textarea { padding: 1rem; border: 2px solid #ddd; border-radius: 5px; font-size: 1rem; font-family: inherit; }
+input:focus, textarea:focus { outline: none; border-color: #667eea; }
+.submit-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 1rem; font-size: 1.1rem; border-radius: 5px; cursor: pointer; font-weight: bold; }
+.contact-info { background: #f8f9fa; padding: 2rem; border-radius: 10px; }
+.contact-info h3 { color: #667eea; margin-bottom: 1rem; }
+.contact-info p { margin-bottom: 1rem; font-size: 1.1rem; }
+.social-links { display: flex; gap: 1rem; margin-top: 2rem; }
+.social-btn { padding: 0.8rem 1.5rem; background: #667eea; color: white; text-decoration: none; border-radius: 5px; }
+.social-btn:hover { background: #764ba2; }
+footer { background: #333; color: white; text-align: center; padding: 2rem; margin-top: 4rem; }
+@media (max-width: 768px) {
+  .mobile-toggle { display: block; }
+  .nav-menu { display: none; flex-direction: column; position: absolute; top: 100%; left: 0; right: 0; background: #667eea; padding: 1rem; }
+  .nav-menu.active { display: flex !important; }
+  .hero h1 { font-size: 2rem; }
+  .about-content, .contact-container { grid-template-columns: 1fr; }
+  .services-grid { grid-template-columns: 1fr; }
+}`;
+
+    const javascript = `function smoothScroll(id) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function toggleMenu() {
+  document.getElementById('navMenu').classList.toggle('active');
+}
+
+function handleSubmit(event) {
+  event.preventDefault();
+  alert('✅ Thank you! Your message has been sent successfully. We will get back to you soon!');
+  event.target.reset();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.nav-menu a').forEach(link => {
+    link.addEventListener('click', () => document.getElementById('navMenu').classList.remove('active'));
+  });
+});`;
+
+    return {
+      html,
+      css,
+      javascript,
+      components: ['Single Page Website'],
+      description: `Professional website for ${content.businessName}`
+    };
   }
 }
 

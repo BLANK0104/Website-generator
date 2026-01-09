@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Monitor, Smartphone, Tablet, Code, Download, Copy, Check } from 'lucide-react';
+import { Monitor, Smartphone, Tablet, Code, Download, Copy, Check, Maximize2 } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { generatePreviewURL, exportWebsite, copyToClipboard } from '../utils/export';
@@ -43,6 +43,38 @@ const Preview = ({ generatedCode }) => {
       generatedCode.javascript,
       'my-website'
     );
+  };
+
+  const handleFullscreen = () => {
+    // Open preview in a new window/tab without any UI interference
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Preview - Fullscreen</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 0;
+              overflow: auto;
+            }
+          </style>
+        </head>
+        <body>
+          <iframe 
+            src="${previewURL}" 
+            style="width: 100vw; height: 100vh; border: none; display: block;"
+            sandbox="allow-scripts"
+          ></iframe>
+        </body>
+        </html>
+      `);
+      newWindow.document.close();
+    }
   };
 
   const getPreviewWidth = () => {
@@ -124,6 +156,13 @@ const Preview = ({ generatedCode }) => {
               >
                 <Smartphone size={18} />
               </button>
+              <button
+                className="view-btn fullscreen-btn"
+                onClick={handleFullscreen}
+                title="Open in fullscreen (new tab)"
+              >
+                <Maximize2 size={18} />
+              </button>
             </>
           ) : (
             <button
@@ -186,7 +225,7 @@ const Preview = ({ generatedCode }) => {
           <p>{generatedCode.description}</p>
           {generatedCode.components && generatedCode.components.length > 0 && (
             <div className="components-used">
-              <strong>Components used:</strong>{' '}
+              <strong>Pages included:</strong>{' '}
               {generatedCode.components.join(', ')}
             </div>
           )}

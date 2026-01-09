@@ -38,6 +38,44 @@
   background: #fafafa;
 }
 
+.page-selector {
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.page-selector label {
+  font-weight: 600;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.page-btn {
+  padding: 0.4rem 0.8rem;
+  background: white;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  text-transform: capitalize;
+}
+
+.page-btn:hover {
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+}
+
+.page-btn.active {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  color: white;
+  border-color: #8b5cf6;
+}
+
 .preview-tabs {
   display: flex;
   gap: 0.5rem;
@@ -93,6 +131,18 @@
   background: #667eea;
   border-color: #667eea;
   color: white;
+}
+
+.view-btn.fullscreen-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: #667eea;
+  color: white;
+  margin-left: 0.5rem;
+}
+
+.view-btn.fullscreen-btn:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  transform: scale(1.05);
 }
 
 .action-btn {
