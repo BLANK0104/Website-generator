@@ -51,86 +51,120 @@ class AIService {
 
   async generateWebsite(description) {
     try {
-      const prompt = `You are an expert full-stack web developer. Create a complete, fully functional, production-ready website based on this request: "${description}"
+      const prompt = `You are a world-class web designer and developer. Create a STUNNING, MODERN, FULLY FUNCTIONAL website for: "${description}"
 
-🎯 YOUR MISSION: Create the BEST possible website - be creative, add features, make it impressive!
+🎨 DESIGN EXCELLENCE - Make it VISUALLY SPECTACULAR:
+- **Modern Gradients**: Use vibrant color gradients (linear-gradient(135deg, #667eea 0%, #764ba2 100%))
+- **Glass Morphism**: backdrop-filter: blur(10px), semi-transparent backgrounds
+- **Smooth Animations**: CSS transitions, transform effects, fade-in on scroll
+- **Professional Shadows**: box-shadow: 0 10px 40px rgba(0,0,0,0.1)
+- **Hover Effects**: Scale, lift, glow effects on interactive elements
+- **Hero Section**: Full-screen with impressive background, bold typography
+- **Modern Typography**: Large headings (3-4rem), clear hierarchy, line-height 1.6
+- **Spacing**: Generous padding/margin, breathing room, max-width 1200px containers
+- **Color Schemes**: Professional palettes - blues/purples OR orange/red OR green/teal
 
-📋 ABSOLUTE REQUIREMENTS:
+🚀 IMPRESSIVE FEATURES TO INCLUDE:
+- Sticky navigation with backdrop blur on scroll
+- Smooth scroll navigation between sections
+- Animated counters or stats section
+- Image cards with hover zoom effects
+- Testimonial slider or carousel
+- Contact form with validation
+- Footer with social links
+- Mobile hamburger menu
+- Parallax scroll effects (CSS only, no external libs)
+- Loading animations for images
 
-1. **WORKING BUTTONS** - Every button MUST work:
-   - Navigation buttons: onclick="smoothScroll('sectionId')"
-   - External links: onclick="window.open('https://url.com', '_blank')"
-   - Phone links: <a href="tel:+1234567890">Call Us</a>
-   - Email links: <a href="mailto:email@example.com">Email Us</a>
-   - Actions: onclick="handleAction()" (and define handleAction in JavaScript!)
-   
-2. **WORKING IMAGES** - Use REAL working image URLs:
-   - Unsplash: https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80
-   - OR placeholder: https://via.placeholder.com/800x600/667eea/ffffff?text=Image
-   - NO broken image URLs!
+⚠️ CRITICAL RULES - NO EXTERNAL LIBRARIES:
+- **NO particles.js, THREE.js, or ANY external JS libraries**
+- **Use ONLY vanilla JavaScript** - no jQuery, no frameworks
+- **Use ONLY CSS animations** - no GSAP, no anime.js
+- **Self-contained code** - everything must work standalone
+- If you want particle effects, create them with vanilla JS canvas
 
-3. **COMPLETE JAVASCRIPT** - Define ALL functions:
+✅ WORKING CODE REQUIREMENTS:
+
+1. **HTML Structure**:
+   - Include <!DOCTYPE html>, proper head with meta tags
+   - Semantic HTML5 (header, nav, main, section, footer)
+   - All sections with clear IDs for navigation
+
+2. **ALL BUTTONS MUST WORK**:
+   \`\`\`html
+   <button onclick="smoothScroll('contact')">Contact</button>
+   <a href="tel:+15551234567">📞 Call</a>
+   <a href="mailto:email@example.com">✉️ Email</a>
+   \`\`\`
+
+3. **REAL IMAGES** - Use actual working URLs:
+   \`\`\`html
+   <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80" alt="Food">
+   <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=800&q=80" alt="Jewelry">
+   <img src="https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80" alt="Camera">
+   \`\`\`
+
+4. **COMPLETE JAVASCRIPT** - Define ALL functions used:
    \`\`\`javascript
    function smoothScroll(id) {
      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
    }
    
+   function toggleMenu() {
+     const menu = document.querySelector('.nav-menu');
+     menu?.classList.toggle('active');
+   }
+   
    function handleSubmit(e) {
      e.preventDefault();
-     alert('✅ Form submitted successfully!');
+     alert('✅ Thank you! We will contact you soon.');
      e.target.reset();
    }
    
-   function toggleMenu() {
-     document.querySelector('.nav-menu')?.classList.toggle('active');
+   // Add scroll animations
+   document.addEventListener('DOMContentLoaded', () => {
+     const observer = new IntersectionObserver((entries) => {
+       entries.forEach(entry => {
+         if (entry.isIntersecting) {
+           entry.target.classList.add('fade-in');
+         }
+       });
+     });
+     document.querySelectorAll('section').forEach(el => observer.observe(el));
+   });
+   \`\`\`
+
+5. **MODERN CSS** - Include these effects:
+   \`\`\`css
+   .fade-in {
+     animation: fadeInUp 0.8s ease;
+   }
+   
+   @keyframes fadeInUp {
+     from { opacity: 0; transform: translateY(30px); }
+     to { opacity: 1; transform: translateY(0); }
+   }
+   
+   .card {
+     transition: transform 0.3s, box-shadow 0.3s;
+   }
+   
+   .card:hover {
+     transform: translateY(-10px);
+     box-shadow: 0 20px 40px rgba(0,0,0,0.2);
    }
    \`\`\`
 
-4. **MODERN DESIGN** - Make it beautiful:
-   - Use gradients, shadows, animations
-   - Responsive design with mobile menu
-   - Smooth transitions and hover effects
-   - Professional color schemes
-   - Clean, modern layout
-
-5. **BE CREATIVE** - Add impressive features:
-   - Animated sections (fade in on scroll)
-   - Particle backgrounds
-   - Interactive elements
-   - Smooth scrolling navigation
-   - Contact forms that work
-   - Social media buttons
-   - Image galleries
-   - Testimonials
-   - Whatever makes it amazing!
-
-📝 EXAMPLES OF PERFECT CODE:
-
-HTML Button Examples:
-\`\`\`html
-<button onclick="smoothScroll('contact')" class="cta-button">Contact Us</button>
-<a href="tel:+15551234567" class="phone-btn">📞 Call Now</a>
-<a href="mailto:info@example.com" class="email-btn">✉️ Email Us</a>
-<button onclick="window.open('https://github.com', '_blank')">Visit GitHub</button>
-\`\`\`
-
-Working Image Examples:
-\`\`\`html
-<img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80" alt="Hero">
-<img src="https://via.placeholder.com/400x300/667eea/ffffff?text=Service+1" alt="Service">
-\`\`\`
-
-🎨 RETURN FORMAT:
-Return a JSON object with three fields:
+🎨 RETURN FORMAT (JSON ONLY):
 {
-  "html": "complete HTML code here",
-  "css": "complete CSS code here", 
-  "javascript": "complete JavaScript code here"
+  "html": "complete HTML with <!DOCTYPE html>, head, body, ALL content",
+  "css": "complete CSS with modern effects, gradients, animations",
+  "javascript": "complete vanilla JS with ALL functions defined"
 }
 
-⚠️ CRITICAL: Return ONLY the JSON object, no markdown formatting, no \`\`\`json tags, just pure JSON!
+⚠️ Return ONLY pure JSON, no markdown, no \`\`\`json tags!
 
-NOW CREATE THE BEST WEBSITE POSSIBLE!`;
+CREATE AN AMAZING WEBSITE NOW!`;
 
       const result = await this.groq.chat.completions.create({
         messages: [{ role: 'user', content: prompt }],
