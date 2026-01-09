@@ -8,7 +8,8 @@ const mongoose = require('mongoose');
 dotenv.config();
 
 // Import routes
-const generateRoutes = require('./routes/generate');
+const generateWebsiteRoutes = require('./routes/generateWebsite');
+const previewRoutes = require('./routes/preview');
 const projectRoutes = require('./routes/projects');
 const componentRoutes = require('./routes/components');
 const chatRoutes = require('./routes/chat');
@@ -30,7 +31,8 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/website-g
 .catch((err) => console.error('❌ MongoDB connection error:', err));
 
 // Routes
-app.use('/api/generate', generateRoutes);
+app.use('/api/website', generateWebsiteRoutes);
+app.use('/preview', previewRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/components', componentRoutes);
 app.use('/api/chat', chatRoutes);

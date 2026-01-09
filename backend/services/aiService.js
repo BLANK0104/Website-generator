@@ -1,5 +1,6 @@
+// Enhanced AI Service for NLP interpretation and website code generation
 const Groq = require('groq-sdk');
-const Conversation = require('../models/Conversation');
+const codeGenerator = require('./codeGenerator');
 
 class AIService {
   constructor() {
@@ -8,606 +9,371 @@ class AIService {
     });
   }
 
-  async chatWebsite(conversationId, userMessage) {
+  // Main function: Interpret natural language and generate complete website
+  async interpretAndGenerate(userInput) {
     try {
-      let conversation = conversationId ? await Conversation.findById(conversationId) : null;
+      // Step 1: Extract specifications from natural language
+      const specifications = await this.extractSpecifications(userInput);
       
-      if (!conversation) {
-        conversation = new Conversation({ messages: [] });
-      }
-
-      conversation.messages.push({ role: 'user', content: userMessage });
-
-      const isInitial = !conversation.currentWebsite || !conversation.currentWebsite.html;
+      // Step 2: Enrich specifications with AI-generated content
+      const enrichedSpecs = await this.enrichSpecifications(specifications);
       
-      if (isInitial) {
-        const result = await this.generateWebsite(userMessage);
-        conversation.currentWebsite = result;
-        conversation.messages.push({ role: 'assistant', content: `✅ Created ${result.description}` });
-      } else {
-        const result = await this.modifyWebsite(conversation.currentWebsite, userMessage);
-        conversation.currentWebsite = result;
-        conversation.messages.push({ role: 'assistant', content: `✅ ${result.description}` });
-      }
-
-      conversation.updatedAt = new Date();
-      await conversation.save();
-
+      // Step 3: Generate complete website code
+      const websiteCode = codeGenerator.generateWebsite(enrichedSpecs);
+      
+      // Step 4: Generate file structure
+      const fileStructure = this.generateFileStructure(websiteCode, enrichedSpecs);
+      
       return {
-        conversationId: conversation._id,
-        website: {
-          html: conversation.currentWebsite.html,
-          css: conversation.currentWebsite.css,
-          javascript: conversation.currentWebsite.javascript,
-          components: conversation.currentWebsite.components,
-          description: conversation.currentWebsite.description
-        },
-        messages: conversation.messages
+        specifications: enrichedSpecs,
+        code: websiteCode,
+        files: fileStructure,
+        summary: this.generateSummary(enrichedSpecs)
       };
     } catch (error) {
-      console.error('Chat Service Error:', error);
-      throw new Error(`Failed to process chat: ${error.message}`);
+      console.error('Error in interpretAndGenerate:', error);
+      throw error;
     }
   }
 
-  async generateWebsite(description) {
-    try {
-      const contentPrompt = `Generate content for: "${description}"
+  // Extract website specifications from natural language
+  async extractSpecifications(userInput) {
+    const prompt = `Analyze this website request and extract structured specifications in JSON format:
 
-Return JSON with:
+User Request: "${userInput}"
+
+Extract and return ONLY a valid JSON object with this structure:
 {
-  "businessName": "business name",
-  "heroHeadline": "catchy headline",
-  "heroSubheadline": "subheadline",
-  "aboutText": "2-3 paragraphs about the business",
-  "services": [
-    {"name": "Service 1", "description": "details", "price": "$99"},
-    {"name": "Service 2", "description": "details", "price": "$149"},
-    {"name": "Service 3", "description": "details", "price": "$199"}
+  "websiteType": "type of website (e.g., portfolio, business, blog, ecommerce)",
+  "siteName": "suggested website name",
+  "industry": "industry or field",
+  "pages": [
+    {
+      "name": "page identifier (e.g., index, about, services, gallery, contact)",
+      "title": "page title",
+      "description": "what this page should contain"
+    }
   ],
-  "phone": "(555) 123-4567",
-  "email": "contact@business.com",
-  "address": "123 Main St, City, State",
-  "category": "restaurant|jewelry|photography|gym|spa|business"
-}`;
+  "components": ["list of required components like navbar, hero, features, gallery, contact, footer"],
+  "features": ["list of features like responsive design, contact form, image gallery"],
+  "backend": {
+    "contactForm": true/false,
+    "authentication": true/false,
+    "admin": true/false,
+    "database": true/false
+  },
+  "designStyle": "modern/minimalist/corporate/creative",
+  "colorScheme": "suggested colors"
+}
 
+Rules:
+- All pages must include navbar and footer components
+- Business websites should have contact forms
+- Portfolio websites should have gallery
+- Include at least 3-5 pages
+- Always include index, about, and contact pages`;
+
+    try {
       const completion = await this.groq.chat.completions.create({
-        messages: [{ role: 'user', content: contentPrompt }],
+        messages: [{ role: 'user', content: prompt }],
         model: 'llama-3.3-70b-versatile',
-        temperature: 0.7,
+        temperature: 0.3,
         max_tokens: 2000,
         response_format: { type: 'json_object' }
       });
 
-      const content = JSON.parse(completion.choices[0].message.content);
-      const website = this.buildTemplate(content);
-      
-      return {
-        ...website,
-        content,
-        description: `professional website for ${content.businessName}`
-      };
+      const specs = JSON.parse(completion.choices[0].message.content);
+      return specs;
     } catch (error) {
-      console.error('Generation Error:', error);
-      throw new Error(`Failed to generate: ${error.message}`);
+      console.error('Error extracting specifications:', error);
+      return this.getDefaultSpecifications(userInput);
     }
   }
 
-  async modifyWebsite(currentWebsite, modification) {
-    try {
-      const modificationPrompt = `You are an expert web developer. The user wants to modify their website.
+  // Enrich specifications with AI-generated content
+  async enrichSpecifications(specs) {
+    const enrichedSpecs = { ...specs };
 
-CURRENT WEBSITE CODE:
+    // Generate content for each page
+    for (let page of enrichedSpecs.pages) {
+      page.heroData = await this.generateHeroContent(page, specs);
+      
+      if (specs.components.includes('features') || specs.components.includes('services')) {
+        page.featuresData = await this.generateFeaturesContent(page, specs);
+      }
+      
+      page.navData = this.generateNavData(enrichedSpecs);
+      page.footerData = this.generateFooterData(enrichedSpecs);
+      
+      if (page.name === 'index') {
+        page.heroStyle = 'centered';
+      } else {
+        page.heroStyle = 'withImage';
+      }
 
-HTML:
-${currentWebsite.html}
+      if (page.name === 'contact') {
+        page.contactData = this.generateContactData(specs);
+      }
 
-CSS:
-${currentWebsite.css}
+      if (page.description?.includes('gallery') || page.name === 'gallery') {
+        page.galleryData = this.generateGalleryData(specs);
+      }
+    }
 
-JAVASCRIPT:
-${currentWebsite.javascript || 'none'}
+    return enrichedSpecs;
+  }
 
-USER REQUEST: "${modification}"
+  // Generate hero section content
+  async generateHeroContent(page, specs) {
+    const prompt = `Create compelling hero section content for a ${page.title} page of a ${specs.websiteType} website in ${specs.industry}.
 
-INSTRUCTIONS:
-1. Make the EXACT changes the user requested
-2. Common requests: change colors, change text, add/remove sections, change layout, update images
-3. For color changes: Find and replace hex codes in CSS (background, color properties)
-4. For text changes: Update the specific text in HTML
-5. For structure changes: Modify HTML structure and CSS accordingly
-6. KEEP all working buttons and JavaScript functions intact unless specifically asked to change them
-7. Return COMPLETE modified HTML, CSS, and JavaScript (not snippets)
-
-Return JSON:
+Return JSON with:
 {
-  "html": "complete updated HTML code",
-  "css": "complete updated CSS code", 
-  "javascript": "complete JavaScript code (keep existing if not changed)",
-  "description": "brief description of what was changed"
+  "title": "catchy main headline (5-8 words)",
+  "subtitle": "engaging subtitle (10-15 words)",
+  "buttons": [
+    {"text": "button text", "href": "#contact or #features or page link", "style": "primary or secondary"}
+  ],
+  "imageUrl": "https://via.placeholder.com/800x600",
+  "imageAlt": "description"
 }`;
 
+    try {
       const completion = await this.groq.chat.completions.create({
-        messages: [{ role: 'user', content: modificationPrompt }],
+        messages: [{ role: 'user', content: prompt }],
         model: 'llama-3.3-70b-versatile',
-        temperature: 0.5,
-        max_tokens: 8000,
+        temperature: 0.7,
+        max_tokens: 800,
         response_format: { type: 'json_object' }
       });
 
-      const modified = JSON.parse(completion.choices[0].message.content);
-      
-      return {
-        html: modified.html || currentWebsite.html,
-        css: modified.css || currentWebsite.css,
-        javascript: modified.javascript || currentWebsite.javascript || '',
-        components: currentWebsite.components,
-        content: currentWebsite.content,
-        description: modified.description || 'Updated website'
-      };
+      return JSON.parse(completion.choices[0].message.content);
     } catch (error) {
-      console.error('Modification Error:', error);
-      throw new Error(`Failed to modify: ${error.message}`);
+      console.error('Error generating hero content:', error);
+      return {
+        title: page.title,
+        subtitle: `Welcome to ${specs.siteName}`,
+        buttons: [
+          { text: 'Get Started', href: '#contact', style: 'primary' },
+          { text: 'Learn More', href: '#features', style: 'secondary' }
+        ]
+      };
     }
   }
 
-  buildTemplate(content) {
-    const imageMap = {
-      restaurant: ['photo-1504674900247-0877df9cc836', 'photo-1555939594-58d7cb561ad1', 'photo-1540189549336-e6e99c3679fe'],
-      jewelry: ['photo-1515562141207-7a88fb7ce338', 'photo-1535632066927-ab7c9ab60908', 'photo-1599643478518-a784e5dc4c8f'],
-      photography: ['photo-1542038784456-1ea8e935640e', 'photo-1471341971476-ae15ff5dd4ea', 'photo-1452587925148-ce544e77e70d'],
-      gym: ['photo-1534438327276-14e5300c3a48', 'photo-1517836357463-d25dfeac3438', 'photo-1571019614242-c5c5dee9f50b'],
-      spa: ['photo-1544161515-4ab6ce6db874', 'photo-1552693673-1bf958298935', 'photo-1540555700478-4be289fbecef'],
-      business: ['photo-1557804506-669a67965ba0', 'photo-1516802273409-68526ee1bdd6', 'photo-1497366216548-37526070297c']
+  // Generate features/services content
+  async generateFeaturesContent(page, specs) {
+    if (!page.description?.includes('service') && 
+        !page.description?.includes('feature') && 
+        page.name !== 'index' && 
+        page.name !== 'services') {
+      return null;
+    }
+
+    const prompt = `Create 4-6 feature/service items for a ${specs.websiteType} website in ${specs.industry}.
+
+Return JSON with:
+{
+  "title": "Section title (e.g., Our Services, What We Offer)",
+  "subtitle": "Section description (1 sentence)",
+  "items": [
+    {
+      "icon": "emoji icon",
+      "title": "Feature/Service name",
+      "description": "Brief description (20-30 words)"
+    }
+  ]
+}
+
+Make it professional and relevant to ${specs.industry}.`;
+
+    try {
+      const completion = await this.groq.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.7,
+        max_tokens: 1500,
+        response_format: { type: 'json_object' }
+      });
+
+      return JSON.parse(completion.choices[0].message.content);
+    } catch (error) {
+      console.error('Error generating features content:', error);
+      return {
+        title: 'Our Services',
+        subtitle: 'What we offer to our clients',
+        items: [
+          { icon: '🎯', title: 'Service 1', description: 'Professional service description goes here with details about what we offer.' },
+          { icon: '💎', title: 'Service 2', description: 'High-quality service that meets your needs and exceeds expectations.' },
+          { icon: '🚀', title: 'Service 3', description: 'Fast and reliable service delivery with attention to detail and quality.' }
+        ]
+      };
+    }
+  }
+
+  // Generate navigation data
+  generateNavData(specs) {
+    return {
+      siteName: specs.siteName,
+      navLinks: specs.pages.map(page => ({
+        text: page.title,
+        href: page.name === 'index' ? '/' : `/${page.name}`
+      }))
     };
+  }
 
-    const images = imageMap[content.category] || imageMap.business;
+  // Generate footer data
+  generateFooterData(specs) {
+    return {
+      siteName: specs.siteName,
+      description: `${specs.siteName} - Your trusted partner in ${specs.industry}`,
+      links: specs.pages.map(page => ({
+        text: page.title,
+        href: page.name === 'index' ? '/' : `/${page.name}`
+      })),
+      contact: {
+        email: 'contact@example.com',
+        phone: '+1 (555) 123-4567'
+      },
+      year: new Date().getFullYear()
+    };
+  }
+
+  // Generate contact form data
+  generateContactData(specs) {
+    return {
+      title: 'Get In Touch',
+      subtitle: `Have questions? Send us a message and we'll respond as soon as possible.`
+    };
+  }
+
+  // Generate gallery data
+  generateGalleryData(specs) {
+    const imageCount = 6;
+    const images = [];
     
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${content.businessName}</title>
-</head>
-<body>
-  <header>
-    <nav>
-      <div class="logo">${content.businessName}</div>
-      <button class="mobile-toggle" onclick="toggleMenu()">☰</button>
-      <div class="nav-menu" id="navMenu">
-        <a onclick="smoothScroll('hero')">Home</a>
-        <a onclick="smoothScroll('about')">About</a>
-        <a onclick="smoothScroll('services')">Services</a>
-        <a onclick="smoothScroll('contact')">Contact</a>
-      </div>
-    </nav>
-  </header>
+    for (let i = 1; i <= imageCount; i++) {
+      images.push({
+        url: `https://via.placeholder.com/400x300?text=Gallery+Image+${i}`,
+        alt: `Gallery image ${i}`,
+        caption: `${specs.industry} showcase ${i}`
+      });
+    }
 
-  <section id="hero" class="hero">
-    <div class="hero-content">
-      <h1>${content.heroHeadline}</h1>
-      <p>${content.heroSubheadline}</p>
-      <button onclick="smoothScroll('services')" class="cta-btn">Explore Services</button>
-      <button onclick="smoothScroll('contact')" class="cta-btn secondary">Contact Us</button>
-    </div>
-    <img src="https://images.unsplash.com/${images[0]}?w=800&q=80" alt="Hero" class="hero-image">
-  </section>
+    return {
+      title: 'Our Gallery',
+      images
+    };
+  }
 
-  <section id="about" class="about">
-    <h2>About Us</h2>
-    <div class="about-content">
-      <img src="https://images.unsplash.com/${images[1]}?w=800&q=80" alt="About" class="about-image">
-      <div class="about-text">
-        <p>${content.aboutText}</p>
-      </div>
-    </div>
-  </section>
+  // Generate file structure for the website
+  generateFileStructure(code, specs) {
+    const files = [];
 
-  <section id="services" class="services">
-    <h2>Our Services</h2>
-    <div class="services-grid">
-      ${content.services.map((service, i) => `
-        <div class="service-card">
-          <img src="https://images.unsplash.com/${images[i % images.length]}?w=800&q=80" alt="${service.name}">
-          <h3>${service.name}</h3>
-          <p>${service.description}</p>
-          <p class="price">${service.price}</p>
-          <button class="service-btn" onclick="smoothScroll('contact')">Learn More</button>
-        </div>
-      `).join('')}
-    </div>
-  </section>
-
-  <section id="contact" class="contact">
-    <h2>Contact Us</h2>
-    <div class="contact-container">
-      <form onsubmit="handleSubmit(event)">
-        <input type="text" placeholder="Your Name" required>
-        <input type="email" placeholder="Your Email" required>
-        <textarea placeholder="Your Message" rows="5" required></textarea>
-        <button type="submit" class="submit-btn">Send Message</button>
-      </form>
+    // Frontend files
+    Object.keys(code.frontend).forEach(pageName => {
+      const page = code.frontend[pageName];
       
-      <div class="contact-info">
-        <h3>Get In Touch</h3>
-        <p><strong>Phone:</strong> <a href="tel:${content.phone.replace(/[^\d]/g, '')}">${content.phone}</a></p>
-        <p><strong>Email:</strong> <a href="mailto:${content.email}">${content.email}</a></p>
-        <p><strong>Address:</strong> ${content.address}</p>
-        
-        <div class="social-links">
-          <button class="social-btn" onclick="alert('Follow us on Facebook!')">Facebook</button>
-          <button class="social-btn" onclick="alert('Follow us on Instagram!')">Instagram</button>
-          <button class="social-btn" onclick="alert('Follow us on Twitter!')">Twitter</button>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <footer>
-    <p>&copy; 2026 ${content.businessName}. All rights reserved.</p>
-  </footer>
-</body>
-</html>`;
-
-    const css = `* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  line-height: 1.6;
-  color: #333;
-  background: #fff;
-}
-
-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 1rem 0;
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-nav {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 2rem;
-}
-
-.logo {
-  font-size: 1.5rem;
-  font-weight: bold;
-}
-
-.mobile-toggle {
-  display: none;
-  background: none;
-  border: none;
-  color: white;
-  font-size: 1.5rem;
-  cursor: pointer;
-}
-
-.nav-menu {
-  display: flex;
-  gap: 2rem;
-}
-
-.nav-menu a {
-  color: white;
-  text-decoration: none;
-  font-weight: 500;
-  cursor: pointer;
-  transition: opacity 0.3s;
-}
-
-.nav-menu a:hover {
-  opacity: 0.8;
-}
-
-.hero {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 4rem 2rem;
-  text-align: center;
-  min-height: 500px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.hero h1 {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-}
-
-.hero p {
-  font-size: 1.3rem;
-  margin-bottom: 2rem;
-}
-
-.hero-image {
-  max-width: 800px;
-  width: 100%;
-  height: 400px;
-  object-fit: cover;
-  border-radius: 10px;
-  margin-top: 2rem;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-}
-
-.cta-btn {
-  background: white;
-  color: #667eea;
-  border: none;
-  padding: 1rem 2rem;
-  font-size: 1.1rem;
-  border-radius: 50px;
-  cursor: pointer;
-  margin: 0.5rem;
-  font-weight: bold;
-  transition: transform 0.3s;
-}
-
-.cta-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-}
-
-.cta-btn.secondary {
-  background: transparent;
-  border: 2px solid white;
-  color: white;
-}
-
-.about, .services, .contact {
-  max-width: 1200px;
-  margin: 4rem auto;
-  padding: 2rem;
-}
-
-.about h2, .services h2, .contact h2 {
-  text-align: center;
-  font-size: 2.5rem;
-  margin-bottom: 2rem;
-  color: #667eea;
-}
-
-.about-content {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3rem;
-  align-items: center;
-}
-
-.about-image {
-  width: 100%;
-  height: 400px;
-  object-fit: cover;
-  border-radius: 10px;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-}
-
-.about-text p {
-  font-size: 1.1rem;
-  margin-bottom: 1rem;
-}
-
-.services-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
-}
-
-.service-card {
-  background: white;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-  transition: transform 0.3s;
-}
-
-.service-card:hover {
-  transform: translateY(-5px);
-}
-
-.service-card img {
-  width: 100%;
-  height: 250px;
-  object-fit: cover;
-}
-
-.service-card h3 {
-  padding: 1rem;
-  color: #667eea;
-}
-
-.service-card p {
-  padding: 0 1rem 1rem;
-}
-
-.price {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #764ba2;
-}
-
-.service-btn {
-  width: calc(100% - 2rem);
-  margin: 1rem;
-  padding: 0.8rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: bold;
-}
-
-.contact-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3rem;
-}
-
-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-input, textarea {
-  padding: 1rem;
-  border: 2px solid #ddd;
-  border-radius: 5px;
-  font-size: 1rem;
-  font-family: inherit;
-}
-
-input:focus, textarea:focus {
-  outline: none;
-  border-color: #667eea;
-}
-
-.submit-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  padding: 1rem;
-  font-size: 1.1rem;
-  border-radius: 5px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.contact-info {
-  background: #f8f9fa;
-  padding: 2rem;
-  border-radius: 10px;
-}
-
-.contact-info h3 {
-  color: #667eea;
-  margin-bottom: 1rem;
-}
-
-.contact-info p {
-  margin-bottom: 1rem;
-  font-size: 1.1rem;
-}
-
-.contact-info a {
-  color: #667eea;
-  text-decoration: none;
-}
-
-.contact-info a:hover {
-  text-decoration: underline;
-}
-
-.social-links {
-  display: flex;
-  gap: 1rem;
-  margin-top: 2rem;
-}
-
-.social-btn {
-  padding: 0.8rem 1.5rem;
-  background: #667eea;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.social-btn:hover {
-  background: #764ba2;
-}
-
-footer {
-  background: #333;
-  color: white;
-  text-align: center;
-  padding: 2rem;
-  margin-top: 4rem;
-}
-
-@media (max-width: 768px) {
-  .mobile-toggle {
-    display: block;
-  }
-  
-  .nav-menu {
-    display: none;
-    flex-direction: column;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: #667eea;
-    padding: 1rem;
-  }
-  
-  .nav-menu.active {
-    display: flex !important;
-  }
-  
-  .hero h1 {
-    font-size: 2rem;
-  }
-  
-  .about-content, .contact-container {
-    grid-template-columns: 1fr;
-  }
-  
-  .services-grid {
-    grid-template-columns: 1fr;
-  }
-}`;
-
-    const javascript = `function smoothScroll(id) {
-  const element = document.getElementById(id);
-  if (element) {
-    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-}
-
-function toggleMenu() {
-  const menu = document.getElementById('navMenu');
-  if (menu) {
-    menu.classList.toggle('active');
-  }
-}
-
-function handleSubmit(event) {
-  event.preventDefault();
-  alert('✅ Thank you! Your message has been sent successfully. We will get back to you soon!');
-  event.target.reset();
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  const navLinks = document.querySelectorAll('.nav-menu a');
-  navLinks.forEach(link => {
-    link.addEventListener('click', () => {
-      const menu = document.getElementById('navMenu');
-      if (menu) {
-        menu.classList.remove('active');
+      files.push({
+        path: `public/${pageName}.html`,
+        content: page.html
+      });
+      
+      files.push({
+        path: `public/css/${pageName}.css`,
+        content: page.css
+      });
+      
+      if (page.js) {
+        files.push({
+          path: `public/js/${pageName}.js`,
+          content: page.js
+        });
       }
     });
-  });
-});`;
 
-    return { html, css, javascript, components: ['Single Page Website'] };
+    // Backend files
+    files.push({
+      path: 'server.js',
+      content: code.backend.server
+    });
+
+    Object.keys(code.backend.routes).forEach(routeName => {
+      files.push({
+        path: `routes/${routeName}.js`,
+        content: code.backend.routes[routeName]
+      });
+    });
+
+    Object.keys(code.backend.models).forEach(modelName => {
+      files.push({
+        path: `models/${modelName}.js`,
+        content: code.backend.models[modelName]
+      });
+    });
+
+    files.push({
+      path: 'package.json',
+      content: JSON.stringify(code.backend.package, null, 2)
+    });
+
+    files.push({
+      path: '.env.example',
+      content: codeGenerator.generateEnvTemplate(specs.siteName)
+    });
+
+    files.push({
+      path: 'README.md',
+      content: codeGenerator.generateReadme(specs.siteName, specs)
+    });
+
+    return files;
+  }
+
+  // Generate summary of the website
+  generateSummary(specs) {
+    return {
+      siteName: specs.siteName,
+      type: specs.websiteType,
+      pageCount: specs.pages.length,
+      pages: specs.pages.map(p => p.title),
+      features: specs.features,
+      hasBackend: specs.backend?.contactForm || specs.backend?.authentication,
+      hasForms: specs.backend?.contactForm,
+      hasAuth: specs.backend?.authentication,
+      hasAdmin: specs.backend?.admin,
+      components: specs.components
+    };
+  }
+
+  // Default specifications if AI parsing fails
+  getDefaultSpecifications(userInput) {
+    const keywords = userInput.toLowerCase();
+    
+    const isPortfolio = keywords.includes('portfolio') || keywords.includes('photographer');
+    const isBusiness = keywords.includes('business') || keywords.includes('company');
+    
+    return {
+      websiteType: isPortfolio ? 'portfolio' : isBusiness ? 'business' : 'general',
+      siteName: 'My Website',
+      industry: 'General',
+      pages: [
+        { name: 'index', title: 'Home', description: 'Homepage with hero and features' },
+        { name: 'about', title: 'About', description: 'About us page' },
+        { name: 'services', title: 'Services', description: 'Services we offer' },
+        { name: 'contact', title: 'Contact', description: 'Contact form page' }
+      ],
+      components: ['navbar', 'hero', 'features', 'contact', 'footer'],
+      features: ['Responsive Design', 'Contact Form', 'Modern UI', 'Working Backend'],
+      backend: {
+        contactForm: true,
+        authentication: false,
+        admin: false,
+        database: true
+      },
+      designStyle: 'modern',
+      colorScheme: 'blue and white'
+    };
   }
 }
 

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { Home, FolderOpen, Sparkles } from 'lucide-react';
-import Generator from './components/Generator';
+import WebsiteGenerator from './components/WebsiteGenerator';
 import Projects from './components/Projects';
 import './App.css';
 
 function App() {
-  const [currentView, setCurrentView] = useState('home');
+  const [currentView, setCurrentView] = useState('generator');
 
   const handleProjectSelect = (project) => {
     // Projects functionality can be implemented later
@@ -25,8 +25,8 @@ function App() {
             </div>
             <div className="nav-links">
               <button
-                className={`nav-link ${currentView === 'home' ? 'active' : ''}`}
-                onClick={() => setCurrentView('home')}
+                className={`nav-link ${currentView === 'generator' ? 'active' : ''}`}
+                onClick={() => setCurrentView('generator')}
               >
                 <Home size={18} />
                 Generate
@@ -43,8 +43,8 @@ function App() {
         </nav>
 
         <main className="main-content">
-          {currentView === 'home' ? (
-            <Generator />
+          {currentView === 'generator' ? (
+            <WebsiteGenerator />
           ) : (
             <Projects onProjectSelect={handleProjectSelect} />
           )}
