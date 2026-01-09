@@ -8,6 +8,7 @@ function WebsiteGenerator() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('preview');
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const examplePrompts = [
     "Create a portfolio website for a photographer with a gallery and contact form",
@@ -159,24 +160,55 @@ function WebsiteGenerator() {
 
     return (
       <div className="files-container">
-        <h3>Generated Files ({result.files.length})</h3>
-        <div className="file-tree">
-          {Object.keys(groupedFiles).map(folder => (
-            <div key={folder} className="folder-group">
-              <div className="folder-name">📁 {folder}/</div>
-              <div className="folder-files">
-                {groupedFiles[folder].map((file, i) => (
-                  <div key={i} className="file-item">
-                    <span className="file-icon">📄</span>
-                    <span className="file-path">{file.path}</span>
-                    <span className="file-size">
-                      {(file.content.length / 1024).toFixed(2)} KB
-                    </span>
-                  </div>
-                ))}
+        <div className="files-layout">
+          <div className="file-tree">
+            <h3>Generated Files ({result.files.length})</h3>
+            {Object.keys(groupedFiles).map(folder => (
+              <div key={folder} className="folder-group">
+                <div className="folder-name">📁 {folder}/</div>
+                <div className="folder-files">
+                  {groupedFiles[folder].map((file, i) => (
+                    <div 
+                      key={i} 
+                      className={`file-item ${selectedFile?.path === file.path ? 'selected' : ''}`}
+                      onClick={() => setSelectedFile(file)}
+                    >
+                      <span className="file-icon">📄</span>
+                      <span className="file-path">{file.path}</span>
+                      <span className="file-size">
+                        {(file.content.length / 1024).toFixed(2)} KB
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+          <div className="file-viewer">
+            {selectedFile ? (
+              <>
+                <div className="file-viewer-header">
+                  <h4>{selectedFile.path}</h4>
+                  <button 
+                    className="btn-secondary"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedFile.content);
+                      alert('Code copied to clipboard!');
+                    }}
+                  >
+                    Copy Code
+                  </button>
+                </div>
+                <pre className="file-content">
+                  <code>{selectedFile.content}</code>
+                </pre>
+              </>
+            ) : (
+              <div className="file-viewer-empty">
+                <p>Select a file to view its content</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
