@@ -4,9 +4,8 @@ const Conversation = require('../models/Conversation');
 class AIService {
   constructor() {
     this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // Using gemini-2.0-flash-exp - fastest and most capable free model
     this.model = this.genAI.getGenerativeModel({ 
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.5-flash',
       generationConfig: {
         temperature: 0.9,
         topP: 0.95,
@@ -145,13 +144,13 @@ NOW CREATE THE BEST WEBSITE POSSIBLE!`;
       // Clean response - remove markdown formatting if present
       let cleanResponse = response.trim();
       if (cleanResponse.startsWith('```json')) {
-        cleanResponse = cleanResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+        cleanResponse = cleanResponse.replace(/```json\n?/g, '').replace(/```\n?$/g, '');
       } else if (cleanResponse.startsWith('```')) {
         cleanResponse = cleanResponse.replace(/```\n?/g, '');
       }
       
       const website = JSON.parse(cleanResponse);
-      console.log('✅ Website generated with Gemini');
+      console.log('✅ Website generated with Gemini 2.5 Flash');
       
       // Post-process to ensure everything works
       const processedWebsite = this.postProcessWebsite(website);
@@ -204,13 +203,13 @@ Return ONLY the JSON object, no markdown formatting!`;
       
       let cleanResponse = response.trim();
       if (cleanResponse.startsWith('```json')) {
-        cleanResponse = cleanResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+        cleanResponse = cleanResponse.replace(/```json\n?/g, '').replace(/```\n?$/g, '');
       } else if (cleanResponse.startsWith('```')) {
         cleanResponse = cleanResponse.replace(/```\n?/g, '');
       }
       
       const website = JSON.parse(cleanResponse);
-      console.log('🔄 Website modified with Gemini');
+      console.log('🔄 Website modified with Gemini 2.5 Flash');
       
       const processedWebsite = this.postProcessWebsite(website);
       
