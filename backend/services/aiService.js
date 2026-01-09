@@ -10,29 +10,24 @@ class AIService {
 
   async chatWebsite(conversationId, userMessage) {
     try {
-      // Load or create conversation
       let conversation = conversationId ? await Conversation.findById(conversationId) : null;
       
       if (!conversation) {
         conversation = new Conversation({ messages: [] });
       }
 
-      // Add user message
       conversation.messages.push({ role: 'user', content: userMessage });
 
-      // Determine if this is initial generation or modification
       const isInitial = !conversation.currentWebsite || !conversation.currentWebsite.html;
       
       if (isInitial) {
-        // Initial generation
         const result = await this.generateWebsite(userMessage);
         conversation.currentWebsite = result;
-        conversation.messages.push({ role: 'assistant', content: `✅ ${result.description}` });
+        conversation.messages.push({ role: 'assistant', content: `✅ Created ${result.content.businessName}` });
       } else {
-        // Modification
         const result = await this.modifyWebsite(conversation.currentWebsite, userMessage);
         conversation.currentWebsite = result;
-        conversation.messages.push({ role: 'assistant', content: `✅ ${result.description}` });
+        conversation.messages.push({ role: 'assistant', content: '✅ Updated website' });
       }
 
       conversation.updatedAt = new Date();
@@ -55,271 +50,263 @@ class AIService {
     }
   }
 
-  async modifyWebsite(currentWebsite, modification) {
-    try {
-      const modificationPrompt = `You are an expert web developer. Modify the existing website based on user feedback.
-
-Current website:
-HTML: ${currentWebsite.html.substring(0, 1000)}...
-CSS: ${currentWebsite.css.substring(0, 500)}...
-JavaScript: ${currentWebsite.javascript ? currentWebsite.javascript.substring(0, 500) : 'none'}...
-
-User modification request: "${modification}"
-
-CRITICAL RULES:
-1. **Preserve Working Functionality**: Keep all working buttons, functions, event listeners
-2. **Make Requested Changes**: Apply the exact modifications the user wants
-3. **Maintain Code Quality**: Don't break existing features while adding new ones
-4. **Complete Code**: Return FULL HTML/CSS/JS, not snippets
-5. **Test Logic**: Ensure all onclick, href, and event listeners work
-
-COMMON MODIFICATION TYPES:
-- Color changes: Update CSS hex codes and gradients
-- Content changes: Update text while keeping structure
-- Feature additions: Add new sections/functionality
-- Style changes: Modify layouts, fonts, spacing
-- Bug fixes: Fix broken buttons or functionality
-
-BUTTON REQUIREMENTS:
-- All buttons need onclick="functionName()" or proper href
-- All functions must be defined in JavaScript
-- Use onclick="smoothScroll('id')" for navigation
-- Use href="tel:", href="mailto:" for contact links
-
-Return JSON with COMPLETE updated code:
-{
-  "html": "complete updated HTML",
-  "css": "complete updated CSS",
-  "javascript": "complete updated JavaScript with all functions",
-  "description": "description of changes made"
-}`;
-
-      const completion = await this.groq.chat.completions.create({
-        messages: [{ role: 'user', content: modificationPrompt }],
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.7,
-        max_tokens: 8000,
-        response_format: { type: 'json_object' }
-      });
-
-      const website = JSON.parse(completion.choices[0].message.content);
-      console.log('🔄 Modification applied:', modification);
-      
-      // Post-process modifications too
-      const processedWebsite = this.postProcess(website);
-      
-      return {
-        html: processedWebsite.html || currentWebsite.html,
-        css: processedWebsite.css || currentWebsite.css,
-        javascript: processedWebsite.javascript || currentWebsite.javascript || '',
-        description: website.description || currentWebsite.description,
-        content: currentWebsite.content
-      };
-    } catch (error) {
-      throw new Error(`Failed to modify website: ${error.message}`);
-    }
-  }
-
   async generateWebsite(description) {
     try {
-      // Detect the type of request
-      const isGame = /game|play|interactive|animation|canvas/i.test(description);
-      const isPortfolio = /portfolio|resume|cv|personal site/i.test(description);
-      
-      const prompt = isGame ? this.getGamePrompt(description) : 
-                     isPortfolio ? this.getPortfolioPrompt(description) :
-                     this.getGeneralPrompt(description);
+      const contentPrompt = `Based on this business description: "${description}"
+
+Generate realistic business content (JSON only, NO HTML/CSS/JavaScript):
+
+Required fields:
+1. businessName - creative business name
+2. heroHeadline - catchy headline (5-8 words)
+3. heroSubheadline - compelling subheadline (10-15 words)
+4. aboutText - 2-3 paragraphs about the business
+5. services - array of exactly 3 items, each with:
+   - name (service/product name)
+   - description (2 sentences)
+   - price (format: $XX or $XX-$XX)
+6. phone - format: (555) XXX-XXXX
+7. email - businessname@example.com
+8. address - full street address with city, state, zip
+9. category - MUST be one of: restaurant, jewelry, photography, gym, spa, salon, cafe, bakery, boutique
+
+Return JSON with these EXACT field names.`;
 
       const completion = await this.groq.chat.completions.create({
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'user', content: contentPrompt }],
         model: 'llama-3.3-70b-versatile',
-        temperature: 0.8,
-        max_tokens: 8000,
+        temperature: 0.7,
+        max_tokens: 2000,
         response_format: { type: 'json_object' }
       });
 
-      const website = JSON.parse(completion.choices[0].message.content);
-      console.log('✅ Website generated:', website.description);
+      const content = JSON.parse(completion.choices[0].message.content);
+      console.log('✅ Content generated:', content.businessName);
       
-      // Post-process to ensure functionality
-      const processedWebsite = this.postProcess(website);
+      const website = this.buildFromTemplate(content);
+      website.content = content;
+      website.description = `Professional website for ${content.businessName}`;
       
-      return {
-        html: processedWebsite.html || '',
-        css: processedWebsite.css || '',
-        javascript: processedWebsite.javascript || '',
-        description: website.description || description,
-        content: { description }
-      };
+      return website;
     } catch (error) {
       console.error('AI Service Error:', error);
       throw new Error(`Failed to generate website: ${error.message}`);
     }
   }
 
-  getGamePrompt(description) {
-    return `You are an expert game developer. Create a fully functional browser game: "${description}"
+  buildFromTemplate(content) {
+    const imageMap = {
+      restaurant: ['photo-1504674900247-0877df9cc836', 'photo-1555939594-58d7cb561ad1', 'photo-1540189549336-e6e99c3679fe'],
+      jewelry: ['photo-1515562141207-7a88fb7ce338', 'photo-1535632066927-ab7c9ab60908', 'photo-1599643478518-a784e5dc4c8f'],
+      photography: ['photo-1542038784456-1ea8e935640e', 'photo-1471341971476-ae15ff5dd4ea', 'photo-1452587925148-ce544e77e70d'],
+      gym: ['photo-1534438327276-14e5300c3a48', 'photo-1517836357463-d25dfeac3438', 'photo-1571019614242-c5c5dee9f50b'],
+      spa: ['photo-1544161515-4ab6ce6db874', 'photo-1552693673-1bf958298935', 'photo-1540555700478-4be289fbecef'],
+      salon: ['photo-1560066984-138dadb4c035', 'photo-1582095133179-bfd08e2fc6b3', 'photo-1562322140-8baeececf3df'],
+      cafe: ['photo-1501339847302-ac426a4a7cbb', 'photo-1445116572660-236099ec97a0', 'photo-1509042239860-f550ce710b93'],
+      bakery: ['photo-1509440159596-0249088772ff', 'photo-1486427944299-d1955d23e34d', 'photo-1517433670267-08bbd4be890f'],
+      boutique: ['photo-1441986300917-64674bd600d8', 'photo-1445205170230-053b83016050', 'photo-1483985988355-763728e1935b'],
+      default: ['photo-1557804506-669a67965ba0', 'photo-1516802273409-68526ee1bdd6', 'photo-1518173946687-a4c8892bbd9f']
+    };
 
-CRITICAL REQUIREMENTS:
-1. **Complete Game Loop**: Use requestAnimationFrame for smooth animations
-2. **Full Keyboard/Mouse Controls**: Add event listeners that actually work
-3. **Game State Management**: Track score, lives, level, game over states
-4. **Collision Detection**: Implement actual collision logic
-5. **Visual Feedback**: Show score, animations, particle effects
-6. **Start/Restart**: Include start button and game over screen with restart
-
-WORKING CODE EXAMPLE STRUCTURE:
-- Canvas-based games: Use <canvas id="game"></canvas> with proper 2D context
-- JavaScript MUST include: game loop, update(), draw(), handleInput(), checkCollisions()
-- All event listeners must be properly attached in DOMContentLoaded
-- Use real math for physics (velocity, acceleration, gravity)
-
-CREATIVITY BONUS:
-- Add sound effects (optional, using Web Audio API)
-- Add power-ups or special abilities
-- Include particle effects for impacts/explosions
-- Add smooth animations and transitions
-- Create engaging visual design
-
-Return JSON:
-{
-  "html": "complete HTML with canvas or game container",
-  "css": "complete CSS with game styling",
-  "javascript": "complete working JavaScript with game loop and all mechanics",
-  "description": "what game was created"
-}`;
-  }
-
-  getPortfolioPrompt(description) {
-    return `You are an expert portfolio designer. Create a stunning, professional portfolio: "${description}"
-
-CRITICAL REQUIREMENTS:
-1. **Modern Design**: Use gradients, shadows, smooth animations
-2. **Multiple Sections**: Hero, About, Skills, Projects, Contact
-3. **Interactive Elements**: Smooth scrolling, hover effects, animated skill bars
-4. **Working Links**: All buttons must use onclick="functionName()" or proper hrefs
-5. **Responsive**: Mobile-friendly design with media queries
-6. **Professional**: Clean, minimalist, impressive layout
-
-WORKING BUTTON EXAMPLES YOU MUST USE:
-- Navigation: <a href="#section" onclick="smoothScroll('section')">Link</a>
-- Contact: <a href="mailto:email@example.com">Email</a>
-- Phone: <a href="tel:+1234567890">Call</a>
-- Social: <button onclick="openLink('https://github.com/username')">GitHub</button>
-- Download CV: <button onclick="alert('CV Download Started!')">Download CV</button>
-
-JAVASCRIPT MUST INCLUDE:
-function smoothScroll(id) {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-}
-function openLink(url) {
-  window.open(url, '_blank');
-}
-
-CREATIVITY BONUS:
-- Animated skill bars that fill on scroll
-- Parallax effects on hero section
-- Typing animation for name/title
-- Project cards with flip or zoom effects
-- Animated background (particles, gradients)
-- Dark/Light mode toggle
-
-Return JSON:
-{
-  "html": "complete HTML with all sections",
-  "css": "complete CSS with animations",
-  "javascript": "complete working JavaScript with all interactions",
-  "description": "portfolio features"
-}`;
-  }
-
-  getGeneralPrompt(description) {
-    return `You are an expert web developer. Create a complete, functional website: "${description}"
-
-CRITICAL REQUIREMENTS:
-1. **Working Buttons**: Every button MUST have onclick="functionName()" or proper href
-2. **Proper Links**: Use href="tel:", href="mailto:", href="https://", or onclick events
-3. **Real Images**: Use https://images.unsplash.com/photo-[ID]?w=800&q=80 with real IDs
-4. **JavaScript Functions**: Define ALL functions that buttons call
-5. **Event Listeners**: Attach in DOMContentLoaded or use inline onclick
-6. **Modern Design**: Professional, clean, visually appealing
-
-WORKING BUTTON EXAMPLES YOU MUST USE:
-- Navigation: <button onclick="smoothScroll('section')">Go to Section</button>
-- Links: <a href="tel:+1234567890">Call Now</a> or <a href="mailto:email@example.com">Email</a>
-- External: <button onclick="window.open('https://example.com', '_blank')">Visit</button>
-- Actions: <button onclick="handleAction()">Click Me</button>
-
-JAVASCRIPT MUST INCLUDE:
-- smoothScroll(id) function
-- All functions referenced by onclick
-- Form submission handlers
-- Menu toggle for mobile
-
-CREATIVITY BONUS:
-- Add animations and transitions
-- Include interactive elements
-- Use modern design patterns
-- Add micro-interactions
-- Create engaging user experience
-
-Return JSON:
-{
-  "html": "complete HTML with proper structure",
-  "css": "complete CSS with modern styling",
-  "javascript": "complete JavaScript with ALL functions defined",
-  "description": "what was created"
-}`;
-  }
-
-  postProcess(website) {
-    let html = website.html || '';
-    let js = website.javascript || '';
+    const images = imageMap[content.category] || imageMap.default;
     
-    // Ensure smoothScroll function exists if any onclick="smoothScroll(...)" found
-    if (html.includes('smoothScroll(') && !js.includes('function smoothScroll')) {
-      js += `\nfunction smoothScroll(id) {
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${content.businessName}</title>
+</head>
+<body>
+  <header>
+    <nav>
+      <div class="logo">${content.businessName}</div>
+      <button class="mobile-toggle" onclick="toggleMenu()">☰</button>
+      <div class="nav-menu" id="navMenu">
+        <a onclick="smoothScroll('hero')">Home</a>
+        <a onclick="smoothScroll('about')">About</a>
+        <a onclick="smoothScroll('services')">Services</a>
+        <a onclick="smoothScroll('contact')">Contact</a>
+      </div>
+    </nav>
+  </header>
+
+  <section id="hero" class="hero">
+    <div class="hero-content">
+      <h1>${content.heroHeadline}</h1>
+      <p>${content.heroSubheadline}</p>
+      <button onclick="smoothScroll('services')" class="cta-btn">Explore Services</button>
+      <button onclick="smoothScroll('contact')" class="cta-btn secondary">Contact Us</button>
+    </div>
+    <img src="https://images.unsplash.com/${images[0]}?w=800&q=80" alt="Hero" class="hero-image">
+  </section>
+
+  <section id="about" class="about">
+    <h2>About Us</h2>
+    <div class="about-content">
+      <img src="https://images.unsplash.com/${images[1]}?w=800&q=80" alt="About" class="about-image">
+      <div class="about-text">
+        <p>${content.aboutText}</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="services" class="services">
+    <h2>Our Services</h2>
+    <div class="services-grid">
+      ${content.services.map((service, i) => `
+        <div class="service-card">
+          <img src="https://images.unsplash.com/${images[i % images.length]}?w=800&q=80" alt="${service.name}">
+          <h3>${service.name}</h3>
+          <p>${service.description}</p>
+          <p class="price">${service.price}</p>
+          <button class="service-btn" onclick="smoothScroll('contact')">Learn More</button>
+        </div>
+      `).join('')}
+    </div>
+  </section>
+
+  <section id="contact" class="contact">
+    <h2>Contact Us</h2>
+    <div class="contact-container">
+      <form onsubmit="handleSubmit(event)">
+        <input type="text" placeholder="Your Name" required>
+        <input type="email" placeholder="Your Email" required>
+        <textarea placeholder="Your Message" rows="5" required></textarea>
+        <button type="submit" class="submit-btn">Send Message</button>
+      </form>
+      
+      <div class="contact-info">
+        <h3>Get In Touch</h3>
+        <p><strong>Phone:</strong> <a href="tel:${content.phone.replace(/\D/g, '')}">${content.phone}</a></p>
+        <p><strong>Email:</strong> <a href="mailto:${content.email}">${content.email}</a></p>
+        <p><strong>Address:</strong> ${content.address}</p>
+        
+        <div class="social-links">
+          <button class="social-btn" onclick="alert('Follow us on Facebook!')">Facebook</button>
+          <button class="social-btn" onclick="alert('Follow us on Instagram!')">Instagram</button>
+          <button class="social-btn" onclick="alert('Follow us on Twitter!')">Twitter</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>&copy; 2026 ${content.businessName}. All rights reserved.</p>
+  </footer>
+</body>
+</html>`;
+
+    const css = `* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem 0; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+nav { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 2rem; }
+.logo { font-size: 1.5rem; font-weight: bold; }
+.mobile-toggle { display: none; background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
+.nav-menu { display: flex; gap: 2rem; }
+.nav-menu a { color: white; text-decoration: none; font-weight: 500; cursor: pointer; transition: opacity 0.3s; }
+.nav-menu a:hover { opacity: 0.8; }
+.hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4rem 2rem; text-align: center; min-height: 500px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.hero h1 { font-size: 3rem; margin-bottom: 1rem; }
+.hero p { font-size: 1.3rem; margin-bottom: 2rem; }
+.hero-image { max-width: 800px; width: 100%; height: 400px; object-fit: cover; border-radius: 10px; margin-top: 2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+.cta-btn { background: white; color: #667eea; border: none; padding: 1rem 2rem; font-size: 1.1rem; border-radius: 50px; cursor: pointer; margin: 0.5rem; font-weight: bold; transition: transform 0.3s; }
+.cta-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+.cta-btn.secondary { background: transparent; border: 2px solid white; color: white; }
+.about, .services, .contact { max-width: 1200px; margin: 4rem auto; padding: 2rem; }
+.about h2, .services h2, .contact h2 { text-align: center; font-size: 2.5rem; margin-bottom: 2rem; color: #667eea; }
+.about-content { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; }
+.about-image { width: 100%; height: 400px; object-fit: cover; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+.about-text p { font-size: 1.1rem; margin-bottom: 1rem; }
+.services-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; }
+.service-card { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.1); transition: transform 0.3s; }
+.service-card:hover { transform: translateY(-5px); }
+.service-card img { width: 100%; height: 250px; object-fit: cover; }
+.service-card h3 { padding: 1rem; color: #667eea; }
+.service-card p { padding: 0 1rem 1rem; }
+.price { font-size: 1.5rem; font-weight: bold; color: #764ba2; }
+.service-btn { width: calc(100% - 2rem); margin: 1rem; padding: 0.8rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem; font-weight: bold; }
+.contact-container { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; }
+form { display: flex; flex-direction: column; gap: 1rem; }
+input, textarea { padding: 1rem; border: 2px solid #ddd; border-radius: 5px; font-size: 1rem; font-family: inherit; }
+input:focus, textarea:focus { outline: none; border-color: #667eea; }
+.submit-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 1rem; font-size: 1.1rem; border-radius: 5px; cursor: pointer; font-weight: bold; }
+.contact-info { background: #f8f9fa; padding: 2rem; border-radius: 10px; }
+.contact-info h3 { color: #667eea; margin-bottom: 1rem; }
+.contact-info p { margin-bottom: 1rem; font-size: 1.1rem; }
+.contact-info a { color: #667eea; text-decoration: none; }
+.contact-info a:hover { text-decoration: underline; }
+.social-links { display: flex; gap: 1rem; margin-top: 2rem; }
+.social-btn { padding: 0.8rem 1.5rem; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; }
+.social-btn:hover { background: #764ba2; }
+footer { background: #333; color: white; text-align: center; padding: 2rem; margin-top: 4rem; }
+@media (max-width: 768px) {
+  .mobile-toggle { display: block; }
+  .nav-menu { display: none; flex-direction: column; position: absolute; top: 100%; left: 0; right: 0; background: #667eea; padding: 1rem; }
+  .nav-menu.active { display: flex !important; }
+  .hero h1 { font-size: 2rem; }
+  .about-content, .contact-container { grid-template-columns: 1fr; }
+  .services-grid { grid-template-columns: 1fr; }
+}`;
+
+    const javascript = `function smoothScroll(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}\n`;
-    }
-    
-    // Ensure openLink function exists if needed
-    if (html.includes('openLink(') && !js.includes('function openLink')) {
-      js += `\nfunction openLink(url) {
-  window.open(url, '_blank');
-}\n`;
-    }
-    
-    // Ensure toggleMenu function exists if mobile menu present
-    if (html.includes('toggleMenu()') && !js.includes('function toggleMenu')) {
-      js += `\nfunction toggleMenu() {
-  const menu = document.getElementById('menu') || document.querySelector('.nav-menu') || document.querySelector('nav ul');
-  if (menu) menu.classList.toggle('active');
-}\n`;
-    }
-    
-    // Fix common button issues - convert href="#" to proper onclick
-    html = html.replace(/href="#"([^>]*?)>/g, (match) => {
-      if (!match.includes('onclick')) {
-        return match.replace('href="#"', 'href="javascript:void(0)" onclick="alert(\'Feature coming soon!\')"');
-      }
-      return match;
-    });
-    
-    // Wrap JavaScript in DOMContentLoaded if not already
-    if (js && !js.includes('DOMContentLoaded') && !js.includes('window.onload')) {
-      js = `document.addEventListener('DOMContentLoaded', function() {\n${js}\n});`;
-    }
-    
+}
+
+function toggleMenu() {
+  document.getElementById('navMenu').classList.toggle('active');
+}
+
+function handleSubmit(event) {
+  event.preventDefault();
+  alert('✅ Thank you! Your message has been sent successfully. We will get back to you soon!');
+  event.target.reset();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.nav-menu a').forEach(link => {
+    link.addEventListener('click', () => document.getElementById('navMenu').classList.remove('active'));
+  });
+});`;
+
     return {
       html,
-      css: website.css || '',
-      javascript: js
+      css,
+      javascript,
+      components: ['Single Page Website']
     };
   }
 
+  async modifyWebsite(currentWebsite, modification) {
+    try {
+      const modificationPrompt = `Current website content:
+${JSON.stringify(currentWebsite.content, null, 2)}
 
+User modification request: "${modification}"
+
+Update the content based on the user's request. Only change what they ask for.
+Return JSON with updated fields: businessName, heroHeadline, heroSubheadline, aboutText, services (array with name, description, price), phone, email, address, category`;
+
+      const completion = await this.groq.chat.completions.create({
+        messages: [{ role: 'user', content: modificationPrompt }],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.7,
+        max_tokens: 2000,
+        response_format: { type: 'json_object' }
+      });
+
+      const updatedContent = JSON.parse(completion.choices[0].message.content);
+      console.log('🔄 Modification applied:', modification);
+      
+      const website = this.buildFromTemplate(updatedContent);
+      website.content = updatedContent;
+      website.description = `Updated: ${modification}`;
+      
+      return website;
+    } catch (error) {
+      throw new Error(`Failed to modify website: ${error.message}`);
+    }
+  }
 }
-
 
 module.exports = new AIService();
