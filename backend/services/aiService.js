@@ -23,11 +23,11 @@ class AIService {
       if (isInitial) {
         const result = await this.generateWebsite(userMessage);
         conversation.currentWebsite = result;
-        conversation.messages.push({ role: 'assistant', content: `✅ Created ${result.content.businessName}` });
+        conversation.messages.push({ role: 'assistant', content: `✅ Created ${result.description}` });
       } else {
         const result = await this.modifyWebsite(conversation.currentWebsite, userMessage);
         conversation.currentWebsite = result;
-        conversation.messages.push({ role: 'assistant', content: '✅ Updated website' });
+        conversation.messages.push({ role: 'assistant', content: `✅ ${result.description}` });
       }
 
       conversation.updatedAt = new Date();
@@ -39,7 +39,6 @@ class AIService {
           html: conversation.currentWebsite.html,
           css: conversation.currentWebsite.css,
           javascript: conversation.currentWebsite.javascript,
-          components: conversation.currentWebsite.components,
           description: conversation.currentWebsite.description
         },
         messages: conversation.messages
@@ -50,27 +49,141 @@ class AIService {
     }
   }
 
+  async modifyWebsite(currentWebsite, modification) {
+    try {
+      let html = currentWebsite.html;
+      let css = currentWebsite.css;
+      let js = currentWebsite.javascript || '';
+      
+      const lowerMod = modification.toLowerCase();
+      
+      // Background color changes
+      if (lowerMod.includes('background') && (lowerMod.includes('black') || lowerMod.includes('dark'))) {
+        css = css.replace(/background:\s*white/gi, 'background: #1a1a1a');
+        css = css.replace(/background:\s*#fff(fff)?/gi, 'background: #1a1a1a');
+        css = css.replace(/background-color:\s*white/gi, 'background-color: #1a1a1a');
+        css = css.replace(/background-color:\s*#fff(fff)?/gi, 'background-color: #1a1a1a');
+        css = css.replace(/color:\s*#333/gi, 'color: #e0e0e0');
+        css = css.replace(/color:\s*black/gi, 'color: #e0e0e0');
+        return {
+          html,
+          css,
+          javascript: js,
+          description: 'Changed background to dark theme',
+          content: currentWebsite.content
+        };
+      }
+      
+      if (lowerMod.includes('background') && (lowerMod.includes('white') || lowerMod.includes('light'))) {
+        css = css.replace(/background:\s*#1a1a1a/gi, 'background: white');
+        css = css.replace(/background-color:\s*#1a1a1a/gi, 'background-color: white');
+        css = css.replace(/color:\s*#e0e0e0/gi, 'color: #333');
+        return {
+          html,
+          css,
+          javascript: js,
+          description: 'Changed background to light theme',
+          content: currentWebsite.content
+        };
+      }
+
+      // Color changes
+      const colorMatch = modification.match(/(blue|red|green|purple|orange|pink|yellow|teal|cyan|indigo)/i);
+      if (colorMatch && (lowerMod.includes('color') || lowerMod.includes('theme') || lowerMod.includes('change'))) {
+        const colorMap = {
+          blue: { primary: '#3b82f6', secondary: '#2563eb' },
+          red: { primary: '#ef4444', secondary: '#dc2626' },
+          green: { primary: '#10b981', secondary: '#059669' },
+          purple: { primary: '#8b5cf6', secondary: '#7c3aed' },
+          orange: { primary: '#f97316', secondary: '#ea580c' },
+          pink: { primary: '#ec4899', secondary: '#db2777' },
+          yellow: { primary: '#eab308', secondary: '#ca8a04' },
+          teal: { primary: '#14b8a6', secondary: '#0d9488' },
+          cyan: { primary: '#06b6d4', secondary: '#0891b2' },
+          indigo: { primary: '#6366f1', secondary: '#4f46e5' }
+        };
+        
+        const color = colorMap[colorMatch[1].toLowerCase()];
+        if (color) {
+          css = css.replace(/#667eea/gi, color.primary);
+          css = css.replace(/#764ba2/gi, color.secondary);
+          
+          return {
+            html,
+            css,
+            javascript: js,
+            description: `Changed theme to ${colorMatch[1]}`,
+            content: currentWebsite.content
+          };
+        }
+      }
+
+      // Text modifications - use AI
+      const textChangePrompt = `User wants to modify text: "${modification}"
+
+Current HTML:
+${html.substring(0, 2000)}...
+
+Find the text they want to change and provide replacements.
+Return JSON with:
+{
+  "changes": [
+    {"search": "exact old text", "replace": "new text"}
+  ],
+  "description": "what changed"
+}`;
+
+      const completion = await this.groq.chat.completions.create({
+        messages: [{ role: 'user', content: textChangePrompt }],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.3,
+        max_tokens: 1000,
+        response_format: { type: 'json_object' }
+      });
+
+      const result = JSON.parse(completion.choices[0].message.content);
+      
+      if (result.changes && Array.isArray(result.changes)) {
+        result.changes.forEach(change => {
+          if (change.search && change.replace) {
+            html = html.replace(new RegExp(change.search, 'gi'), change.replace);
+          }
+        });
+      }
+
+      return {
+        html,
+        css,
+        javascript: js,
+        description: result.description || 'Updated content',
+        content: currentWebsite.content
+      };
+    } catch (error) {
+      console.error('Modification error:', error);
+      throw new Error(`Failed to modify website: ${error.message}`);
+    }
+  }
+
   async generateWebsite(description) {
     try {
-      const contentPrompt = `Based on this business description: "${description}"
+      const contentPrompt = `Generate website content for: "${description}"
 
-Generate realistic business content (JSON only, NO HTML/CSS/JavaScript):
-
-Required fields:
-1. businessName - creative business name
-2. heroHeadline - catchy headline (5-8 words)
-3. heroSubheadline - compelling subheadline (10-15 words)
-4. aboutText - 2-3 paragraphs about the business
-5. services - array of exactly 3 items, each with:
-   - name (service/product name)
-   - description (2 sentences)
-   - price (format: $XX or $XX-$XX)
-6. phone - format: (555) XXX-XXXX
-7. email - businessname@example.com
-8. address - full street address with city, state, zip
-9. category - MUST be one of: restaurant, jewelry, photography, gym, spa, salon, cafe, bakery, boutique
-
-Return JSON with these EXACT field names.`;
+Return JSON:
+{
+  "businessName": "name",
+  "heroHeadline": "main headline",
+  "heroSubheadline": "subheadline",
+  "aboutText": "about text (2-3 paragraphs)",
+  "services": [
+    {"name": "service 1", "description": "details", "price": "$XX"},
+    {"name": "service 2", "description": "details", "price": "$XX"},
+    {"name": "service 3", "description": "details", "price": "$XX"}
+  ],
+  "phone": "(555) XXX-XXXX",
+  "email": "email@example.com",
+  "address": "full address",
+  "category": "restaurant|jewelry|photography|gym|spa|tech|default"
+}`;
 
       const completion = await this.groq.chat.completions.create({
         messages: [{ role: 'user', content: contentPrompt }],
@@ -81,30 +194,27 @@ Return JSON with these EXACT field names.`;
       });
 
       const content = JSON.parse(completion.choices[0].message.content);
-      console.log('✅ Content generated:', content.businessName);
+      const website = this.buildTemplate(content);
       
-      const website = this.buildFromTemplate(content);
-      website.content = content;
-      website.description = `Professional website for ${content.businessName}`;
-      
-      return website;
+      return {
+        ...website,
+        content,
+        description: `${content.businessName} website`
+      };
     } catch (error) {
-      console.error('AI Service Error:', error);
+      console.error('Generation error:', error);
       throw new Error(`Failed to generate website: ${error.message}`);
     }
   }
 
-  buildFromTemplate(content) {
+  buildTemplate(content) {
     const imageMap = {
       restaurant: ['photo-1504674900247-0877df9cc836', 'photo-1555939594-58d7cb561ad1', 'photo-1540189549336-e6e99c3679fe'],
       jewelry: ['photo-1515562141207-7a88fb7ce338', 'photo-1535632066927-ab7c9ab60908', 'photo-1599643478518-a784e5dc4c8f'],
       photography: ['photo-1542038784456-1ea8e935640e', 'photo-1471341971476-ae15ff5dd4ea', 'photo-1452587925148-ce544e77e70d'],
       gym: ['photo-1534438327276-14e5300c3a48', 'photo-1517836357463-d25dfeac3438', 'photo-1571019614242-c5c5dee9f50b'],
       spa: ['photo-1544161515-4ab6ce6db874', 'photo-1552693673-1bf958298935', 'photo-1540555700478-4be289fbecef'],
-      salon: ['photo-1560066984-138dadb4c035', 'photo-1582095133179-bfd08e2fc6b3', 'photo-1562322140-8baeececf3df'],
-      cafe: ['photo-1501339847302-ac426a4a7cbb', 'photo-1445116572660-236099ec97a0', 'photo-1509042239860-f550ce710b93'],
-      bakery: ['photo-1509440159596-0249088772ff', 'photo-1486427944299-d1955d23e34d', 'photo-1517433670267-08bbd4be890f'],
-      boutique: ['photo-1441986300917-64674bd600d8', 'photo-1445205170230-053b83016050', 'photo-1483985988355-763728e1935b'],
+      tech: ['photo-1550751827-4bd374c3f58b', 'photo-1518770660439-4636190af475', 'photo-1461749280684-dccba630e2f6'],
       default: ['photo-1557804506-669a67965ba0', 'photo-1516802273409-68526ee1bdd6', 'photo-1518173946687-a4c8892bbd9f']
     };
 
@@ -178,7 +288,7 @@ Return JSON with these EXACT field names.`;
       
       <div class="contact-info">
         <h3>Get In Touch</h3>
-        <p><strong>Phone:</strong> <a href="tel:${content.phone.replace(/\D/g, '')}">${content.phone}</a></p>
+        <p><strong>Phone:</strong> <a href="tel:${content.phone.replace(/[^0-9]/g, '')}">${content.phone}</a></p>
         <p><strong>Email:</strong> <a href="mailto:${content.email}">${content.email}</a></p>
         <p><strong>Address:</strong> ${content.address}</p>
         
@@ -250,11 +360,17 @@ footer { background: #333; color: white; text-align: center; padding: 2rem; marg
 }`;
 
     const javascript = `function smoothScroll(id) {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const element = document.getElementById(id);
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 function toggleMenu() {
-  document.getElementById('navMenu').classList.toggle('active');
+  const menu = document.getElementById('navMenu');
+  if (menu) {
+    menu.classList.toggle('active');
+  }
 }
 
 function handleSubmit(event) {
@@ -264,48 +380,18 @@ function handleSubmit(event) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-  document.querySelectorAll('.nav-menu a').forEach(link => {
-    link.addEventListener('click', () => document.getElementById('navMenu').classList.remove('active'));
+  const navLinks = document.querySelectorAll('.nav-menu a');
+  navLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      const menu = document.getElementById('navMenu');
+      if (menu) {
+        menu.classList.remove('active');
+      }
+    });
   });
 });`;
 
-    return {
-      html,
-      css,
-      javascript,
-      components: ['Single Page Website']
-    };
-  }
-
-  async modifyWebsite(currentWebsite, modification) {
-    try {
-      const modificationPrompt = `Current website content:
-${JSON.stringify(currentWebsite.content, null, 2)}
-
-User modification request: "${modification}"
-
-Update the content based on the user's request. Only change what they ask for.
-Return JSON with updated fields: businessName, heroHeadline, heroSubheadline, aboutText, services (array with name, description, price), phone, email, address, category`;
-
-      const completion = await this.groq.chat.completions.create({
-        messages: [{ role: 'user', content: modificationPrompt }],
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.7,
-        max_tokens: 2000,
-        response_format: { type: 'json_object' }
-      });
-
-      const updatedContent = JSON.parse(completion.choices[0].message.content);
-      console.log('🔄 Modification applied:', modification);
-      
-      const website = this.buildFromTemplate(updatedContent);
-      website.content = updatedContent;
-      website.description = `Updated: ${modification}`;
-      
-      return website;
-    } catch (error) {
-      throw new Error(`Failed to modify website: ${error.message}`);
-    }
+    return { html, css, javascript };
   }
 }
 
