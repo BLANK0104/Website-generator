@@ -39,6 +39,7 @@ class AIService {
           html: conversation.currentWebsite.html,
           css: conversation.currentWebsite.css,
           javascript: conversation.currentWebsite.javascript,
+          components: conversation.currentWebsite.components,
           description: conversation.currentWebsite.description
         },
         messages: conversation.messages
@@ -49,140 +50,25 @@ class AIService {
     }
   }
 
-  async modifyWebsite(currentWebsite, modification) {
-    try {
-      let html = currentWebsite.html;
-      let css = currentWebsite.css;
-      let js = currentWebsite.javascript || '';
-      
-      const lowerMod = modification.toLowerCase();
-      
-      // Background color changes
-      if (lowerMod.includes('background') && (lowerMod.includes('black') || lowerMod.includes('dark'))) {
-        css = css.replace(/background:\s*white/gi, 'background: #1a1a1a');
-        css = css.replace(/background:\s*#fff(fff)?/gi, 'background: #1a1a1a');
-        css = css.replace(/background-color:\s*white/gi, 'background-color: #1a1a1a');
-        css = css.replace(/background-color:\s*#fff(fff)?/gi, 'background-color: #1a1a1a');
-        css = css.replace(/color:\s*#333/gi, 'color: #e0e0e0');
-        css = css.replace(/color:\s*black/gi, 'color: #e0e0e0');
-        return {
-          html,
-          css,
-          javascript: js,
-          description: 'Changed background to dark theme',
-          content: currentWebsite.content
-        };
-      }
-      
-      if (lowerMod.includes('background') && (lowerMod.includes('white') || lowerMod.includes('light'))) {
-        css = css.replace(/background:\s*#1a1a1a/gi, 'background: white');
-        css = css.replace(/background-color:\s*#1a1a1a/gi, 'background-color: white');
-        css = css.replace(/color:\s*#e0e0e0/gi, 'color: #333');
-        return {
-          html,
-          css,
-          javascript: js,
-          description: 'Changed background to light theme',
-          content: currentWebsite.content
-        };
-      }
-
-      // Color changes
-      const colorMatch = modification.match(/(blue|red|green|purple|orange|pink|yellow|teal|cyan|indigo)/i);
-      if (colorMatch && (lowerMod.includes('color') || lowerMod.includes('theme') || lowerMod.includes('change'))) {
-        const colorMap = {
-          blue: { primary: '#3b82f6', secondary: '#2563eb' },
-          red: { primary: '#ef4444', secondary: '#dc2626' },
-          green: { primary: '#10b981', secondary: '#059669' },
-          purple: { primary: '#8b5cf6', secondary: '#7c3aed' },
-          orange: { primary: '#f97316', secondary: '#ea580c' },
-          pink: { primary: '#ec4899', secondary: '#db2777' },
-          yellow: { primary: '#eab308', secondary: '#ca8a04' },
-          teal: { primary: '#14b8a6', secondary: '#0d9488' },
-          cyan: { primary: '#06b6d4', secondary: '#0891b2' },
-          indigo: { primary: '#6366f1', secondary: '#4f46e5' }
-        };
-        
-        const color = colorMap[colorMatch[1].toLowerCase()];
-        if (color) {
-          css = css.replace(/#667eea/gi, color.primary);
-          css = css.replace(/#764ba2/gi, color.secondary);
-          
-          return {
-            html,
-            css,
-            javascript: js,
-            description: `Changed theme to ${colorMatch[1]}`,
-            content: currentWebsite.content
-          };
-        }
-      }
-
-      // Text modifications - use AI
-      const textChangePrompt = `User wants to modify text: "${modification}"
-
-Current HTML:
-${html.substring(0, 2000)}...
-
-Find the text they want to change and provide replacements.
-Return JSON with:
-{
-  "changes": [
-    {"search": "exact old text", "replace": "new text"}
-  ],
-  "description": "what changed"
-}`;
-
-      const completion = await this.groq.chat.completions.create({
-        messages: [{ role: 'user', content: textChangePrompt }],
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.3,
-        max_tokens: 1000,
-        response_format: { type: 'json_object' }
-      });
-
-      const result = JSON.parse(completion.choices[0].message.content);
-      
-      if (result.changes && Array.isArray(result.changes)) {
-        result.changes.forEach(change => {
-          if (change.search && change.replace) {
-            html = html.replace(new RegExp(change.search, 'gi'), change.replace);
-          }
-        });
-      }
-
-      return {
-        html,
-        css,
-        javascript: js,
-        description: result.description || 'Updated content',
-        content: currentWebsite.content
-      };
-    } catch (error) {
-      console.error('Modification error:', error);
-      throw new Error(`Failed to modify website: ${error.message}`);
-    }
-  }
-
   async generateWebsite(description) {
     try {
-      const contentPrompt = `Generate website content for: "${description}"
+      const contentPrompt = `Generate content for: "${description}"
 
-Return JSON:
+Return JSON with:
 {
-  "businessName": "name",
-  "heroHeadline": "main headline",
+  "businessName": "business name",
+  "heroHeadline": "catchy headline",
   "heroSubheadline": "subheadline",
-  "aboutText": "about text (2-3 paragraphs)",
+  "aboutText": "2-3 paragraphs about the business",
   "services": [
-    {"name": "service 1", "description": "details", "price": "$XX"},
-    {"name": "service 2", "description": "details", "price": "$XX"},
-    {"name": "service 3", "description": "details", "price": "$XX"}
+    {"name": "Service 1", "description": "details", "price": "$99"},
+    {"name": "Service 2", "description": "details", "price": "$149"},
+    {"name": "Service 3", "description": "details", "price": "$199"}
   ],
-  "phone": "(555) XXX-XXXX",
-  "email": "email@example.com",
-  "address": "full address",
-  "category": "restaurant|jewelry|photography|gym|spa|tech|default"
+  "phone": "(555) 123-4567",
+  "email": "contact@business.com",
+  "address": "123 Main St, City, State",
+  "category": "restaurant|jewelry|photography|gym|spa|business"
 }`;
 
       const completion = await this.groq.chat.completions.create({
@@ -199,11 +85,69 @@ Return JSON:
       return {
         ...website,
         content,
-        description: `${content.businessName} website`
+        description: `professional website for ${content.businessName}`
       };
     } catch (error) {
-      console.error('Generation error:', error);
-      throw new Error(`Failed to generate website: ${error.message}`);
+      console.error('Generation Error:', error);
+      throw new Error(`Failed to generate: ${error.message}`);
+    }
+  }
+
+  async modifyWebsite(currentWebsite, modification) {
+    try {
+      const modificationPrompt = `You are an expert web developer. The user wants to modify their website.
+
+CURRENT WEBSITE CODE:
+
+HTML:
+${currentWebsite.html}
+
+CSS:
+${currentWebsite.css}
+
+JAVASCRIPT:
+${currentWebsite.javascript || 'none'}
+
+USER REQUEST: "${modification}"
+
+INSTRUCTIONS:
+1. Make the EXACT changes the user requested
+2. Common requests: change colors, change text, add/remove sections, change layout, update images
+3. For color changes: Find and replace hex codes in CSS (background, color properties)
+4. For text changes: Update the specific text in HTML
+5. For structure changes: Modify HTML structure and CSS accordingly
+6. KEEP all working buttons and JavaScript functions intact unless specifically asked to change them
+7. Return COMPLETE modified HTML, CSS, and JavaScript (not snippets)
+
+Return JSON:
+{
+  "html": "complete updated HTML code",
+  "css": "complete updated CSS code", 
+  "javascript": "complete JavaScript code (keep existing if not changed)",
+  "description": "brief description of what was changed"
+}`;
+
+      const completion = await this.groq.chat.completions.create({
+        messages: [{ role: 'user', content: modificationPrompt }],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.5,
+        max_tokens: 8000,
+        response_format: { type: 'json_object' }
+      });
+
+      const modified = JSON.parse(completion.choices[0].message.content);
+      
+      return {
+        html: modified.html || currentWebsite.html,
+        css: modified.css || currentWebsite.css,
+        javascript: modified.javascript || currentWebsite.javascript || '',
+        components: currentWebsite.components,
+        content: currentWebsite.content,
+        description: modified.description || 'Updated website'
+      };
+    } catch (error) {
+      console.error('Modification Error:', error);
+      throw new Error(`Failed to modify: ${error.message}`);
     }
   }
 
@@ -214,11 +158,10 @@ Return JSON:
       photography: ['photo-1542038784456-1ea8e935640e', 'photo-1471341971476-ae15ff5dd4ea', 'photo-1452587925148-ce544e77e70d'],
       gym: ['photo-1534438327276-14e5300c3a48', 'photo-1517836357463-d25dfeac3438', 'photo-1571019614242-c5c5dee9f50b'],
       spa: ['photo-1544161515-4ab6ce6db874', 'photo-1552693673-1bf958298935', 'photo-1540555700478-4be289fbecef'],
-      tech: ['photo-1550751827-4bd374c3f58b', 'photo-1518770660439-4636190af475', 'photo-1461749280684-dccba630e2f6'],
-      default: ['photo-1557804506-669a67965ba0', 'photo-1516802273409-68526ee1bdd6', 'photo-1518173946687-a4c8892bbd9f']
+      business: ['photo-1557804506-669a67965ba0', 'photo-1516802273409-68526ee1bdd6', 'photo-1497366216548-37526070297c']
     };
 
-    const images = imageMap[content.category] || imageMap.default;
+    const images = imageMap[content.category] || imageMap.business;
     
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -288,7 +231,7 @@ Return JSON:
       
       <div class="contact-info">
         <h3>Get In Touch</h3>
-        <p><strong>Phone:</strong> <a href="tel:${content.phone.replace(/[^0-9]/g, '')}">${content.phone}</a></p>
+        <p><strong>Phone:</strong> <a href="tel:${content.phone.replace(/[^\d]/g, '')}">${content.phone}</a></p>
         <p><strong>Email:</strong> <a href="mailto:${content.email}">${content.email}</a></p>
         <p><strong>Address:</strong> ${content.address}</p>
         
@@ -307,56 +250,329 @@ Return JSON:
 </body>
 </html>`;
 
-    const css = `* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem 0; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-nav { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 2rem; }
-.logo { font-size: 1.5rem; font-weight: bold; }
-.mobile-toggle { display: none; background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
-.nav-menu { display: flex; gap: 2rem; }
-.nav-menu a { color: white; text-decoration: none; font-weight: 500; cursor: pointer; transition: opacity 0.3s; }
-.nav-menu a:hover { opacity: 0.8; }
-.hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4rem 2rem; text-align: center; min-height: 500px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.hero h1 { font-size: 3rem; margin-bottom: 1rem; }
-.hero p { font-size: 1.3rem; margin-bottom: 2rem; }
-.hero-image { max-width: 800px; width: 100%; height: 400px; object-fit: cover; border-radius: 10px; margin-top: 2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-.cta-btn { background: white; color: #667eea; border: none; padding: 1rem 2rem; font-size: 1.1rem; border-radius: 50px; cursor: pointer; margin: 0.5rem; font-weight: bold; transition: transform 0.3s; }
-.cta-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
-.cta-btn.secondary { background: transparent; border: 2px solid white; color: white; }
-.about, .services, .contact { max-width: 1200px; margin: 4rem auto; padding: 2rem; }
-.about h2, .services h2, .contact h2 { text-align: center; font-size: 2.5rem; margin-bottom: 2rem; color: #667eea; }
-.about-content { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; }
-.about-image { width: 100%; height: 400px; object-fit: cover; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
-.about-text p { font-size: 1.1rem; margin-bottom: 1rem; }
-.services-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; }
-.service-card { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.1); transition: transform 0.3s; }
-.service-card:hover { transform: translateY(-5px); }
-.service-card img { width: 100%; height: 250px; object-fit: cover; }
-.service-card h3 { padding: 1rem; color: #667eea; }
-.service-card p { padding: 0 1rem 1rem; }
-.price { font-size: 1.5rem; font-weight: bold; color: #764ba2; }
-.service-btn { width: calc(100% - 2rem); margin: 1rem; padding: 0.8rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem; font-weight: bold; }
-.contact-container { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; }
-form { display: flex; flex-direction: column; gap: 1rem; }
-input, textarea { padding: 1rem; border: 2px solid #ddd; border-radius: 5px; font-size: 1rem; font-family: inherit; }
-input:focus, textarea:focus { outline: none; border-color: #667eea; }
-.submit-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 1rem; font-size: 1.1rem; border-radius: 5px; cursor: pointer; font-weight: bold; }
-.contact-info { background: #f8f9fa; padding: 2rem; border-radius: 10px; }
-.contact-info h3 { color: #667eea; margin-bottom: 1rem; }
-.contact-info p { margin-bottom: 1rem; font-size: 1.1rem; }
-.contact-info a { color: #667eea; text-decoration: none; }
-.contact-info a:hover { text-decoration: underline; }
-.social-links { display: flex; gap: 1rem; margin-top: 2rem; }
-.social-btn { padding: 0.8rem 1.5rem; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; }
-.social-btn:hover { background: #764ba2; }
-footer { background: #333; color: white; text-align: center; padding: 2rem; margin-top: 4rem; }
+    const css = `* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+  color: #333;
+  background: #fff;
+}
+
+header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+nav {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2rem;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.mobile-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.nav-menu {
+  display: flex;
+  gap: 2rem;
+}
+
+.nav-menu a {
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.3s;
+}
+
+.nav-menu a:hover {
+  opacity: 0.8;
+}
+
+.hero {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 4rem 2rem;
+  text-align: center;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero h1 {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  font-size: 1.3rem;
+  margin-bottom: 2rem;
+}
+
+.hero-image {
+  max-width: 800px;
+  width: 100%;
+  height: 400px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-top: 2rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.cta-btn {
+  background: white;
+  color: #667eea;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  border-radius: 50px;
+  cursor: pointer;
+  margin: 0.5rem;
+  font-weight: bold;
+  transition: transform 0.3s;
+}
+
+.cta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+.cta-btn.secondary {
+  background: transparent;
+  border: 2px solid white;
+  color: white;
+}
+
+.about, .services, .contact {
+  max-width: 1200px;
+  margin: 4rem auto;
+  padding: 2rem;
+}
+
+.about h2, .services h2, .contact h2 {
+  text-align: center;
+  font-size: 2.5rem;
+  margin-bottom: 2rem;
+  color: #667eea;
+}
+
+.about-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: center;
+}
+
+.about-image {
+  width: 100%;
+  height: 400px;
+  object-fit: cover;
+  border-radius: 10px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+}
+
+.about-text p {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.service-card {
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+  transition: transform 0.3s;
+}
+
+.service-card:hover {
+  transform: translateY(-5px);
+}
+
+.service-card img {
+  width: 100%;
+  height: 250px;
+  object-fit: cover;
+}
+
+.service-card h3 {
+  padding: 1rem;
+  color: #667eea;
+}
+
+.service-card p {
+  padding: 0 1rem 1rem;
+}
+
+.price {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #764ba2;
+}
+
+.service-btn {
+  width: calc(100% - 2rem);
+  margin: 1rem;
+  padding: 0.8rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.contact-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+input, textarea {
+  padding: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 5px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+input:focus, textarea:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.submit-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 1rem;
+  font-size: 1.1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.contact-info {
+  background: #f8f9fa;
+  padding: 2rem;
+  border-radius: 10px;
+}
+
+.contact-info h3 {
+  color: #667eea;
+  margin-bottom: 1rem;
+}
+
+.contact-info p {
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+.contact-info a {
+  color: #667eea;
+  text-decoration: none;
+}
+
+.contact-info a:hover {
+  text-decoration: underline;
+}
+
+.social-links {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.social-btn {
+  padding: 0.8rem 1.5rem;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.social-btn:hover {
+  background: #764ba2;
+}
+
+footer {
+  background: #333;
+  color: white;
+  text-align: center;
+  padding: 2rem;
+  margin-top: 4rem;
+}
+
 @media (max-width: 768px) {
-  .mobile-toggle { display: block; }
-  .nav-menu { display: none; flex-direction: column; position: absolute; top: 100%; left: 0; right: 0; background: #667eea; padding: 1rem; }
-  .nav-menu.active { display: flex !important; }
-  .hero h1 { font-size: 2rem; }
-  .about-content, .contact-container { grid-template-columns: 1fr; }
-  .services-grid { grid-template-columns: 1fr; }
+  .mobile-toggle {
+    display: block;
+  }
+  
+  .nav-menu {
+    display: none;
+    flex-direction: column;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #667eea;
+    padding: 1rem;
+  }
+  
+  .nav-menu.active {
+    display: flex !important;
+  }
+  
+  .hero h1 {
+    font-size: 2rem;
+  }
+  
+  .about-content, .contact-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .services-grid {
+    grid-template-columns: 1fr;
+  }
 }`;
 
     const javascript = `function smoothScroll(id) {
@@ -391,7 +607,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });`;
 
-    return { html, css, javascript };
+    return { html, css, javascript, components: ['Single Page Website'] };
   }
 }
 
