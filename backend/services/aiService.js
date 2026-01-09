@@ -1,16 +1,10 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require('groq-sdk');
 const Conversation = require('../models/Conversation');
 
 class AIService {
   constructor() {
-    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    this.model = this.genAI.getGenerativeModel({ 
-      model: 'gemini-2.5-flash',
-      generationConfig: {
-        temperature: 0.9,
-        topP: 0.95,
-        maxOutputTokens: 8192,
-      }
+    this.groq = new Groq({
+      apiKey: process.env.GROQ_API_KEY
     });
   }
 
@@ -138,19 +132,16 @@ Return a JSON object with three fields:
 
 NOW CREATE THE BEST WEBSITE POSSIBLE!`;
 
-      const result = await this.model.generateContent(prompt);
-      const response = result.response.text();
+      const result = await this.groq.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.9,
+        max_tokens: 8000,
+        response_format: { type: 'json_object' }
+      });
       
-      // Clean response - remove markdown formatting if present
-      let cleanResponse = response.trim();
-      if (cleanResponse.startsWith('```json')) {
-        cleanResponse = cleanResponse.replace(/```json\n?/g, '').replace(/```\n?$/g, '');
-      } else if (cleanResponse.startsWith('```')) {
-        cleanResponse = cleanResponse.replace(/```\n?/g, '');
-      }
-      
-      const website = JSON.parse(cleanResponse);
-      console.log('✅ Website generated with Gemini 2.5 Flash');
+      const website = JSON.parse(result.choices[0].message.content);
+      console.log('✅ Website generated with Groq');
       
       // Post-process to ensure everything works
       const processedWebsite = this.postProcessWebsite(website);
@@ -198,18 +189,16 @@ USER REQUEST: "${modification}"
 
 Return ONLY the JSON object, no markdown formatting!`;
 
-      const result = await this.model.generateContent(prompt);
-      const response = result.response.text();
+      const result = await this.groq.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.7,
+        max_tokens: 8000,
+        response_format: { type: 'json_object' }
+      });
       
-      let cleanResponse = response.trim();
-      if (cleanResponse.startsWith('```json')) {
-        cleanResponse = cleanResponse.replace(/```json\n?/g, '').replace(/```\n?$/g, '');
-      } else if (cleanResponse.startsWith('```')) {
-        cleanResponse = cleanResponse.replace(/```\n?/g, '');
-      }
-      
-      const website = JSON.parse(cleanResponse);
-      console.log('🔄 Website modified with Gemini 2.5 Flash');
+      const website = JSON.parse(result.choices[0].message.content);
+      console.log('🔄 Website modified with Groq');
       
       const processedWebsite = this.postProcessWebsite(website);
       
