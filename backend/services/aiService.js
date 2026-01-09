@@ -1,10 +1,85 @@
 const Groq = require('groq-sdk');
+const Conversation = require('../models/Conversation');
 
 class AIService {
   constructor() {
     this.groq = new Groq({
       apiKey: process.env.GROQ_API_KEY
     });
+  }
+
+  async chatWebsite(conversationId, userMessage) {
+    try {
+      // Load or create conversation
+      let conversation = conversationId ? await Conversation.findById(conversationId) : null;
+      
+      if (!conversation) {
+        conversation = new Conversation({ messages: [] });
+      }
+
+      // Add user message
+      conversation.messages.push({ role: 'user', content: userMessage });
+
+      // Determine if this is initial generation or modification
+      const isInitial = !conversation.currentWebsite || !conversation.currentWebsite.html;
+      
+      if (isInitial) {
+        // Initial generation
+        const result = await this.generateWebsite(userMessage);
+        conversation.currentWebsite = result;
+        conversation.messages.push({ role: 'assistant', content: `Created website for ${result.content.businessName}` });
+      } else {
+        // Modification
+        const result = await this.modifyWebsite(conversation.currentWebsite, userMessage);
+        conversation.currentWebsite = result;
+        conversation.messages.push({ role: 'assistant', content: 'Updated website based on your feedback' });
+      }
+
+      conversation.updatedAt = new Date();
+      await conversation.save();
+
+      return {
+        conversationId: conversation._id,
+        website: {
+          html: conversation.currentWebsite.html,
+          css: conversation.currentWebsite.css,
+          javascript: conversation.currentWebsite.javascript,
+          components: conversation.currentWebsite.components,
+          description: conversation.currentWebsite.description
+        },
+        messages: conversation.messages
+      };
+    } catch (error) {
+      console.error('Chat Service Error:', error);
+      throw new Error(`Failed to process chat: ${error.message}`);
+    }
+  }
+
+  async modifyWebsite(currentWebsite, modification) {
+    try {
+      const modificationPrompt = `Current website content:
+${JSON.stringify(currentWebsite.content, null, 2)}
+
+User wants to modify: "${modification}"
+
+Return updated content JSON with same structure but incorporating the changes. Keep all existing fields unless specifically modified.`;
+
+      const completion = await this.groq.chat.completions.create({
+        messages: [{ role: 'user', content: modificationPrompt }],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.7,
+        max_tokens: 2000,
+        response_format: { type: 'json_object' }
+      });
+
+      const updatedContent = JSON.parse(completion.choices[0].message.content);
+      const website = this.buildFromTemplate(updatedContent);
+      website.content = updatedContent;
+      
+      return website;
+    } catch (error) {
+      throw new Error(`Failed to modify website: ${error.message}`);
+    }
   }
 
   async generateWebsite(description) {
@@ -35,7 +110,9 @@ Return JSON with these fields: businessName, heroHeadline, heroSubheadline, abou
       const content = JSON.parse(contentCompletion.choices[0].message.content);
       console.log('✅ Content generated:', content.businessName);
 
-      return this.buildFromTemplate(content);
+      const website = this.buildFromTemplate(content);
+      website.content = content;
+      return website;
     } catch (error) {
       console.error('AI Service Error:', error);
       throw new Error(`Failed to generate website: ${error.message}`);
@@ -122,13 +199,13 @@ Return JSON with these fields: businessName, heroHeadline, heroSubheadline, abou
       </form>
       <div class="contact-info">
         <h3>Contact Information</h3>
-        <p><strong>📞 Phone:</strong> ${content.phone}</p>
-        <p><strong>📧 Email:</strong> ${content.email}</p>
+        <p><strong>📞 Phone:</strong> <a href="tel:${content.phone.replace(/[^0-9]/g, '')}">${content.phone}</a></p>
+        <p><strong>📧 Email:</strong> <a href="mailto:${content.email}">${content.email}</a></p>
         <p><strong>📍 Address:</strong> ${content.address}</p>
         <div class="social-links">
-          <a href="https://facebook.com" target="_blank" class="social-btn">Facebook</a>
-          <a href="https://instagram.com" target="_blank" class="social-btn">Instagram</a>
-          <a href="https://twitter.com" target="_blank" class="social-btn">Twitter</a>
+          <a href="#" onclick="alert('Connect with us on Facebook!'); return false;" class="social-btn">📘 Facebook</a>
+          <a href="#" onclick="alert('Follow us on Instagram!'); return false;" class="social-btn">📷 Instagram</a>
+          <a href="#" onclick="alert('Follow us on Twitter!'); return false;" class="social-btn">🐦 Twitter</a>
         </div>
       </div>
     </div>
@@ -177,6 +254,8 @@ input:focus, textarea:focus { outline: none; border-color: #667eea; }
 .contact-info { background: #f8f9fa; padding: 2rem; border-radius: 10px; }
 .contact-info h3 { color: #667eea; margin-bottom: 1rem; }
 .contact-info p { margin-bottom: 1rem; font-size: 1.1rem; }
+.contact-info a { color: #667eea; text-decoration: none; }
+.contact-info a:hover { text-decoration: underline; }
 .social-links { display: flex; gap: 1rem; margin-top: 2rem; }
 .social-btn { padding: 0.8rem 1.5rem; background: #667eea; color: white; text-decoration: none; border-radius: 5px; }
 .social-btn:hover { background: #764ba2; }
