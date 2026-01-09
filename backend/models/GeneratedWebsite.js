@@ -1,5 +1,11 @@
 const mongoose = require('mongoose');
 
+// Force clear the model and schema cache
+delete mongoose.connection.models['GeneratedWebsite'];
+if (mongoose.models.GeneratedWebsite) {
+  delete mongoose.models.GeneratedWebsite;
+}
+
 const generatedWebsiteSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -35,7 +41,7 @@ const generatedWebsiteSchema = new mongoose.Schema({
   }],
   summary: {
     siteName: String,
-    type: String,
+    websiteType: String,  // Changed from 'type' to avoid keyword conflict
     pageCount: Number,
     pages: [String],
     features: [String],
@@ -59,16 +65,11 @@ const generatedWebsiteSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
-});
+}, { strict: true });
 
 generatedWebsiteSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
-
-// Delete existing model if it exists to avoid OverwriteModelError
-if (mongoose.models.GeneratedWebsite) {
-  delete mongoose.models.GeneratedWebsite;
-}
 
 module.exports = mongoose.model('GeneratedWebsite', generatedWebsiteSchema);

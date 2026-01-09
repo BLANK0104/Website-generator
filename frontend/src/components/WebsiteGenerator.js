@@ -94,7 +94,7 @@ function WebsiteGenerator() {
           </div>
           <div className="summary-item">
             <label>Type:</label>
-            <span>{result.summary.type}</span>
+            <span>{result.summary.websiteType}</span>
           </div>
           <div className="summary-item">
             <label>Pages:</label>

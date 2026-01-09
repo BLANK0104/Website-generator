@@ -115,7 +115,7 @@ Rules:
         page.contactData = this.generateContactData(specs);
       }
 
-      if (page.description?.includes('gallery') || page.name === 'gallery') {
+      if (specs.components.includes('gallery') || page.description?.includes('gallery') || page.name === 'gallery') {
         page.galleryData = this.generateGalleryData(specs);
       }
     }
@@ -334,7 +334,7 @@ Make it professional and relevant to ${specs.industry}.`;
   generateSummary(specs) {
     return {
       siteName: specs.siteName,
-      type: specs.websiteType,
+      websiteType: specs.websiteType,
       pageCount: specs.pages.length,
       pages: specs.pages.map(p => p.title),
       features: specs.features,

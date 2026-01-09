@@ -8,6 +8,12 @@ const GeneratedWebsite = require('../models/GeneratedWebsite');
 // Serve preview HTML page
 router.get('/:id', async (req, res) => {
   try {
+    // Validate ObjectId format
+    if (!req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
+      console.log('Invalid ObjectId format:', req.params.id);
+      return res.status(400).send(`<h1>Invalid website ID: ${req.params.id}</h1>`);
+    }
+    
     const website = await GeneratedWebsite.findById(req.params.id);
     
     if (!website) {
