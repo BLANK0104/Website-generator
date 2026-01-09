@@ -64,14 +64,16 @@ router.get('/:id', async (req, res) => {
       );
     }
 
-    // Fix navigation links for preview mode
+    // Fix navigation links for preview mode (only relative URLs, not absolute URLs like https://)
     website.specifications.pages.forEach(page => {
+      // Match href="/pagename" but not href="http://..." or href="https://..."
       const regex = new RegExp(`href="/${page.name}"`, 'g');
       html = html.replace(regex, `href="/preview/${req.params.id}/${page.name}"`);
-      
-      const indexRegex = new RegExp(`href="/"`, 'g');
-      html = html.replace(indexRegex, `href="/preview/${req.params.id}"`);
     });
+    
+    // Fix root link (href="/" -> href="/preview/id/") but avoid matching "://" in URLs
+    // This negative lookahead (?!") prevents matching "//" in "https://"
+    html = html.replace(/href="\/(?!")/g, `href="/preview/${req.params.id}/`);
 
     res.send(html);
 
@@ -121,14 +123,14 @@ router.get('/:id/:page', async (req, res) => {
       );
     }
 
-    // Fix navigation links for preview mode
+    // Fix navigation links for preview mode (only relative URLs, not absolute URLs like https://)
     website.specifications.pages.forEach(page => {
       const regex = new RegExp(`href="/${page.name}"`, 'g');
       html = html.replace(regex, `href="/preview/${req.params.id}/${page.name}"`);
-      
-      const indexRegex = new RegExp(`href="/"`, 'g');
-      html = html.replace(indexRegex, `href="/preview/${req.params.id}"`);
     });
+    
+    // Fix root link but avoid matching "://" in URLs
+    html = html.replace(/href="\/(?!")/g, `href="/preview/${req.params.id}/`);
 
     res.send(html);
 
