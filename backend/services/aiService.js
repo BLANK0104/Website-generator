@@ -27,12 +27,12 @@ class AIService {
         // Initial generation
         const result = await this.generateWebsite(userMessage);
         conversation.currentWebsite = result;
-        conversation.messages.push({ role: 'assistant', content: `Created website for ${result.content.businessName}` });
+        conversation.messages.push({ role: 'assistant', content: `✅ ${result.description}` });
       } else {
         // Modification
         const result = await this.modifyWebsite(conversation.currentWebsite, userMessage);
         conversation.currentWebsite = result;
-        conversation.messages.push({ role: 'assistant', content: 'Updated website based on your feedback' });
+        conversation.messages.push({ role: 'assistant', content: `✅ ${result.description}` });
       }
 
       conversation.updatedAt = new Date();
