@@ -66,4 +66,9 @@ generatedWebsiteSchema.pre('save', function(next) {
   next();
 });
 
+// Delete existing model if it exists to avoid OverwriteModelError
+if (mongoose.models.GeneratedWebsite) {
+  delete mongoose.models.GeneratedWebsite;
+}
+
 module.exports = mongoose.model('GeneratedWebsite', generatedWebsiteSchema);

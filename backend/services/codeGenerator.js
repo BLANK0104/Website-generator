@@ -13,8 +13,7 @@ class CodeGenerator {
     const generatedCode = {
       frontend: this.generateFrontend(specifications),
       backend: this.generateBackend(specifications),
-      database: this.generateDatabaseSchema(specifications),
-      config: this.generateConfig(specifications)
+      database: this.generateDatabaseSchema(specifications)
     };
 
     return generatedCode;

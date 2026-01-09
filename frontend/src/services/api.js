@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://website-generator-tau.vercel.app/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://website-generator-tau.vercel.app/api' || 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
