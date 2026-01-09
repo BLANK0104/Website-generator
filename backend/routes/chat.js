@@ -3,7 +3,7 @@ const router = express.Router();
 const aiService = require('../services/aiService');
 
 // Chat endpoint - handles both initial generation and modifications
-router.post('/chat', async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { message, conversationId } = req.body;
 
