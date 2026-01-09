@@ -31,6 +31,18 @@ router.get('/:id', async (req, res) => {
     const jsFile = website.files.find(f => f.path === 'public/js/index.js');
 
     let html = indexFile.content;
+    
+    // Debug: Check for any template variables left unreplaced
+    const unreplacedVars = html.match(/\{\{[^}]+\}\}/g);
+    if (unreplacedVars) {
+      console.warn('Warning: Unreplaced template variables found:', unreplacedVars);
+    }
+    
+    // Debug: Check image src attributes
+    const imgSrcs = html.match(/src="[^"]+"/g);
+    if (imgSrcs) {
+      console.log('Image sources in HTML:', imgSrcs.slice(0, 3)); // Show first 3
+    }
 
     // Inject CSS inline
     if (cssFile) {
