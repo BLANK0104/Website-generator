@@ -125,6 +125,11 @@ Rules:
 
   // Generate hero section content
   async generateHeroContent(page, specs) {
+    // Get relevant image keywords for hero
+    const keywords = this.getImageKeywords(specs);
+    const heroKeyword = keywords[0]; // Use primary keyword for hero
+    const heroImage = `https://source.unsplash.com/1200x600/?${heroKeyword}`;
+    
     const prompt = `Create compelling hero section content for a ${page.title} page of a ${specs.websiteType} website in ${specs.industry}.
 
 Return JSON with:
@@ -134,7 +139,7 @@ Return JSON with:
   "buttons": [
     {"text": "button text", "href": "#contact or #features or page link", "style": "primary or secondary"}
   ],
-  "imageUrl": "https://via.placeholder.com/800x600",
+  "imageUrl": "${heroImage}",
   "imageAlt": "description"
 }`;
 
@@ -247,15 +252,20 @@ Make it professional and relevant to ${specs.industry}.`;
     };
   }
 
-  // Generate gallery data
+  // Generate gallery data with real images from Unsplash
   generateGalleryData(specs) {
     const imageCount = 6;
     const images = [];
     
+    // Generate keywords based on industry and website type
+    const keywords = this.getImageKeywords(specs);
+    
     for (let i = 1; i <= imageCount; i++) {
+      // Use different keyword combinations for variety
+      const keyword = keywords[i % keywords.length];
       images.push({
-        url: `https://via.placeholder.com/400x300?text=Gallery+Image+${i}`,
-        alt: `Gallery image ${i}`,
+        url: `https://source.unsplash.com/400x300/?${keyword}`,
+        alt: `${specs.industry} image ${i}`,
         caption: `${specs.industry} showcase ${i}`
       });
     }
@@ -264,6 +274,57 @@ Make it professional and relevant to ${specs.industry}.`;
       title: 'Our Gallery',
       images
     };
+  }
+
+  // Generate relevant image keywords based on website type and industry
+  getImageKeywords(specs) {
+    const industry = specs.industry.toLowerCase();
+    const type = specs.websiteType.toLowerCase();
+    
+    // Map industries to relevant Unsplash keywords
+    const keywordMap = {
+      'photography': ['photography', 'camera', 'portrait', 'landscape', 'photo'],
+      'photographer': ['photography', 'camera', 'portrait', 'landscape', 'photo'],
+      'restaurant': ['food', 'cuisine', 'restaurant', 'dining', 'chef', 'meal'],
+      'gym': ['fitness', 'gym', 'workout', 'exercise', 'health', 'sports'],
+      'fitness': ['fitness', 'gym', 'workout', 'exercise', 'health', 'sports'],
+      'jewelry': ['jewelry', 'gold', 'diamond', 'luxury', 'accessories'],
+      'fashion': ['fashion', 'style', 'clothing', 'model', 'design'],
+      'travel': ['travel', 'vacation', 'destination', 'adventure', 'explore'],
+      'real estate': ['house', 'home', 'property', 'architecture', 'interior'],
+      'architecture': ['architecture', 'building', 'design', 'structure', 'modern'],
+      'technology': ['technology', 'computer', 'innovation', 'digital', 'tech'],
+      'business': ['business', 'office', 'professional', 'corporate', 'meeting'],
+      'art': ['art', 'painting', 'creative', 'gallery', 'artistic'],
+      'music': ['music', 'concert', 'instrument', 'performance', 'sound'],
+      'education': ['education', 'learning', 'study', 'school', 'books'],
+      'healthcare': ['healthcare', 'medical', 'health', 'doctor', 'wellness'],
+      'cafe': ['coffee', 'cafe', 'espresso', 'bakery', 'latte'],
+      'coffee': ['coffee', 'cafe', 'espresso', 'latte', 'barista'],
+      'bakery': ['bakery', 'bread', 'pastry', 'dessert', 'cake'],
+      'spa': ['spa', 'relaxation', 'wellness', 'massage', 'beauty'],
+      'salon': ['salon', 'hair', 'beauty', 'styling', 'makeup'],
+      'automotive': ['car', 'automobile', 'vehicle', 'drive', 'luxury-car'],
+      'nature': ['nature', 'landscape', 'forest', 'mountain', 'outdoors']
+    };
+    
+    // Check if industry matches any keyword map
+    for (const [key, keywords] of Object.entries(keywordMap)) {
+      if (industry.includes(key)) {
+        return keywords;
+      }
+    }
+    
+    // Portfolio-specific keywords
+    if (type === 'portfolio') {
+      if (industry.includes('photo')) return keywordMap['photography'];
+      if (industry.includes('design')) return ['design', 'creative', 'art', 'graphic', 'portfolio'];
+      if (industry.includes('art')) return keywordMap['art'];
+      return ['work', 'project', 'creative', 'design', 'professional'];
+    }
+    
+    // Default keywords for business/general websites
+    return ['business', 'professional', 'office', 'modern', 'workplace', 'team'];
   }
 
   // Generate file structure for the website

@@ -123,6 +123,17 @@ class CodeGenerator {
       result = result.replace(regex, data[key] || '');
     });
 
+    // Replace nested properties {{object.property}}
+    result = result.replace(/\{\{([^}]+\.[^}]+)\}\}/g, (match, path) => {
+      const keys = path.split('.');
+      let value = data;
+      for (let key of keys) {
+        value = value?.[key];
+        if (value === undefined) return '';
+      }
+      return value || '';
+    });
+
     // Handle arrays {{#array}}...{{/array}}
     Object.keys(data).forEach(key => {
       if (Array.isArray(data[key])) {
